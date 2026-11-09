@@ -15,8 +15,12 @@ targets: [
 ]
 ```
 
-A private remote dependency requires GitHub access for every developer and CI
-runner. Use an immutable release tag once the standalone repository is published.
+The SDK is public. Add-ons can pin the released SDK without GitHub credentials:
+```swift
+.package(url: "https://github.com/Ammyy9908/LedgeKit.git", exact: "0.1.0")
+```
+Community submission and publication instructions are in
+[LedgeAddOns](https://github.com/Ammyy9908/LedgeAddOns).
 The SDK currently ships the library product LedgeKit and executable ledgekit.
 
 ## Implement a worker
