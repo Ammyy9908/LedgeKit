@@ -94,3 +94,14 @@ CLI scaffolding/build/install, Playground and community publishing.
 Version 1 supplies an access token to trusted native code. A subprocess is not a
 sandbox. Keep this developer preview restricted to trusted code until sandboxing,
 capability enforcement, lifecycle isolation and reviewed distribution are verified.
+
+## Notification banners (0.2.0)
+
+Version 0.2.0 adds the `notification-banners` capability and
+`NotificationBannerRequest` / `NotificationBannerResponse` contracts. These are
+separate from the unchanged Spotify transport. A consenting host supplies a title,
+body and preview preference; the response limits text to 8,450 characters and
+replaces the body with “New notification” when previews are off. Hosts enforce
+request/response size limits, execution timeouts, local trust and lifecycle.
+These APIs require SDK 0.2.0 or later. See the host's Notifications example
+for the bounded one-request executable adapter.

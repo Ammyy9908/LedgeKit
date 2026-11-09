@@ -48,7 +48,7 @@ public struct AddOnManifest: Codable, Sendable {
             guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             else { throw ManifestValidationError.invalidField(field) }
         }
-        for capability in capabilities where capability != "spotify-library" {
+        for capability in capabilities where !["spotify-library", "notification-banners"].contains(capability) {
             throw ManifestValidationError.unsupportedCapability(capability)
         }
         guard Set(capabilities).count == capabilities.count
