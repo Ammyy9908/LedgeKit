@@ -17,6 +17,8 @@ public struct AddOnHandlers: Sendable {
     public var deactivate: @Sendable () async -> Void = {}
     /// Return `false` to refuse a removal that would lose something, such as a transfer in flight.
     public var prepareForRemoval: @Sendable () async -> Bool = { true }
+    /// The user acted on a control in one of the add-on's surfaces. Events arrive in order, one at a time.
+    public var onEvent: @Sendable (SurfaceEvent) async -> Void = { _ in }
 
     var methods: [String: @Sendable (JSONValue) async throws -> JSONValue] = [:]
 
@@ -56,7 +58,19 @@ public enum AddOnSession {
         Task { await current.send(.log(level: level, message: String(message.prefix(4096)))) }
     }
 
-    /// Sends state for a surface or service. Reserved for the surfaces LedgeKit will add.
+    /// Shows the add-on's settings page, replacing the last one sent. Needs `"settings-page"` in `surfaces`.
+    public static func show(_ page: SettingsPage) {
+        guard let payload = try? JSONValue(encoding: page) else { return }
+        update(topic: Surface.settingsTopic, payload: payload)
+    }
+
+    /// Shows the add-on's widgets, replacing the last ones sent. Needs `"widget"` in `surfaces`.
+    public static func show(widgets: [Widget]) {
+        guard let payload = try? JSONValue(encoding: widgets) else { return }
+        update(topic: Surface.widgetsTopic, payload: payload)
+    }
+
+    /// Sends state for a surface or service by topic. `show(_:)` and `show(widgets:)` cover the surfaces.
     public static func update(topic: String, payload: JSONValue) {
         guard let current else { return }
         Task { await current.send(.update(topic: topic, payload: payload)) }
@@ -107,6 +121,14 @@ public enum AddOnSession {
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case SessionProtocol.Method.prepareForRemoval:
                     await send(.response(id: requestID, result: .bool(await handlers.prepareForRemoval()), error: nil))
+                case Surface.eventMethod:
+                    // Events run in order, before anything sent after them.
+                    guard active, let event = try? params.decode(SurfaceEvent.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the event."))
+                        continue
+                    }
+                    await handlers.onEvent(event)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
                 default:
                     guard active, let handler = handlers.methods[method] else {
                         await send(.response(id: requestID, result: nil,

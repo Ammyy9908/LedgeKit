@@ -49,6 +49,39 @@ exit(await AddOnSession.run(id: "my-addon", handlers: handlers))
   that, and restarts an add-on that crashes, at most three times.
 - Messages are limited to 1 MB. See `SessionProtocol` for the full exchange.
 
+## Put something on screen (surfaces, 0.5.0)
+
+A session add-on describes its surfaces as data; Ledge draws them with its own views. Declare them in addon.json
+(`"surfaces": ["settings-page", "widget"]`), then send them whenever they change:
+
+```swift
+handlers.activate = {
+    AddOnSession.show(SettingsPage([
+        SettingsSection("display", title: "Display", rows: [
+            .toggle("showLit", "Show how much is lit", isOn: true),
+            .picker("units", "Units", options: [.init("km", "Kilometres"), .init("mi", "Miles")], selected: "km"),
+            .button("refresh", "Refresh")
+        ])
+    ]))
+    AddOnSession.show(widgets: [
+        Widget("moon", title: "Moon", symbol: "moon.fill", content: .vstack(spacing: 6, children: [
+            .text("Waxing gibbous", style: .title),
+            .progress(0.78, label: "78% lit"),
+            .button(id: "next", title: "Next full moon", symbol: "calendar")
+        ]))
+    ])
+}
+handlers.onEvent = { event in
+    // event.control is the row or button id; event.action says what happened.
+}
+```
+
+- Settings rows: toggle, picker, slider, text field, button, link, read-only value, note. Widgets: vertical and
+  horizontal stacks, text, SF Symbols, a progress bar, buttons and spacers.
+- Each send replaces the last. Ledge keeps controls whose ids don't change, so a field being typed in isn't reset.
+- Ledge draws only surfaces the manifest declares, and refuses descriptions over its limits (200 rows, 8 widgets,
+  100 parts and 6 levels per widget, 1,000 characters per text).
+
 ## Implement a worker (protocol 1)
 
 ```swift
