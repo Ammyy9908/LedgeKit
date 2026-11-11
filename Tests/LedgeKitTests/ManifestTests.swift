@@ -21,8 +21,12 @@ private func manifest(executable: String = "SpotifyLikes", protocolVersion: Int 
 }
 
 @Test func rejectsUnsupportedProtocol() throws {
-    let value = try manifest(protocolVersion: 2)
+    let value = try manifest(protocolVersion: 3)
     #expect(throws: (any Error).self) { try value.validate() }
+}
+
+@Test func acceptsSessionProtocol() throws {
+    try manifest(protocolVersion: 2).validate()
 }
 
 @Test func publicManifestRoundTrips() throws {

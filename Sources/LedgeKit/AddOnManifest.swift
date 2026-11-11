@@ -1,6 +1,7 @@
 import Foundation
 
-/// Metadata for a version-1 executable package. New optional fields preserve old packages.
+/// Metadata for an executable package: protocol 1 runs the program once per request, protocol 2 keeps a
+/// session open. New optional fields preserve old packages.
 public struct AddOnManifest: Codable, Sendable {
     public let id: String
     public let version: String
@@ -35,7 +36,8 @@ public struct AddOnManifest: Codable, Sendable {
         guard !id.isEmpty, id.count <= 64,
               id.allSatisfy({ $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-") })
         else { throw ManifestValidationError.invalidField("id") }
-        guard protocolVersion == 1 else { throw ManifestValidationError.unsupportedProtocol(protocolVersion) }
+        // 1: one program run per request (AddOnWorker). 2: a long-lived session (AddOnSession).
+        guard [1, SessionProtocol.version].contains(protocolVersion) else { throw ManifestValidationError.unsupportedProtocol(protocolVersion) }
         let parts = version.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 3, parts.allSatisfy({
             !$0.isEmpty && $0.allSatisfy({ $0.isASCII && $0.isNumber }) && Int($0) != nil
@@ -72,7 +74,7 @@ public enum ManifestValidationError: Error, Equatable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidField(let field): return "Invalid manifest field: \(field)."
-        case .unsupportedProtocol(let version): return "Unsupported protocol version: \(version). Supported: 1."
+        case .unsupportedProtocol(let version): return "Unsupported protocol version: \(version). Supported: 1 and 2."
         case .unsupportedCapability(let capability): return "Unsupported capability: \(capability)."
         }
     }
