@@ -23,7 +23,33 @@ Community submission and publication instructions are in
 [LedgeAddOns](https://github.com/Ammyy9908/LedgeAddOns).
 The SDK currently ships the library product LedgeKit and executable ledgekit.
 
-## Implement a worker
+## Run a session (protocol 2, 0.3.0)
+
+A session add-on stays running while it's enabled. Ledge starts it once, sends `hello`, then requests, one JSON
+message per line on stdin, and reads replies from stdout. Set `"protocolVersion": 2` in addon.json.
+
+```swift
+import Foundation
+import LedgeKit
+
+var handlers = AddOnHandlers()
+handlers.activate = { /* start timers and observers */ }
+handlers.deactivate = { /* stop everything activate started */ }
+handlers.on("greet") { (request: [String: String]) in
+    ["text": "Hello, \(request["name"] ?? "there")"]
+}
+exit(await AddOnSession.run(id: "my-addon", handlers: handlers))
+```
+
+- Requests run side by side and answer in any order. Throw `AddOnError("…")` for a message the user can see;
+  any other error reaches Ledge as a generic failure.
+- `AddOnSession.log(_:)` writes to Ledge's log. Never log credentials or what the user typed. stderr is kept only
+  as the last lines of diagnostics.
+- The session ends when Ledge closes stdin. Ledge stops anything still running in the add-on's session after
+  that, and restarts an add-on that crashes, at most three times.
+- Messages are limited to 1 MB. See `SessionProtocol` for the full exchange.
+
+## Implement a worker (protocol 1)
 
 ```swift
 import LedgeKit
