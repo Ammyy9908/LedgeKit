@@ -84,3 +84,20 @@ private actor Seen {
     var all: [SurfaceEvent] = []
     func add(_ event: SurfaceEvent) { all.append(event) }
 }
+
+@Test func playerActionsAndAccountRowsValidate() throws {
+    let heart = PlayerAction("like", label: "Like", symbol: "heart", selectedSymbol: "heart.fill", sources: ["com.spotify.client"])
+    try PlayerAction.validate([heart])
+    #expect(try JSONDecoder().decode([PlayerAction].self, from: JSONEncoder().encode([heart])) == [heart])
+    #expect(throws: SurfaceValidationError.duplicateID("like")) { try PlayerAction.validate([heart, heart]) }
+    var noSource = heart; noSource.sources = []
+    #expect(throws: SurfaceValidationError.invalid("sources of like")) { try PlayerAction.validate([noSource]) }
+    var badSource = heart; badSource.sources = ["com.spotify.client; rm"]
+    #expect(throws: SurfaceValidationError.invalid("sources of like")) { try PlayerAction.validate([badSource]) }
+    let many = (0..<5).map { PlayerAction("a\($0)", label: "A", symbol: "star", selectedSymbol: "star.fill", sources: ["x"]) }
+    #expect(throws: (any Error).self) { try PlayerAction.validate(many) }
+    try SettingsPage([SettingsSection("a", rows: [.account("spotify", "Spotify account", provider: "spotify")])]).validate()
+    #expect(throws: SurfaceValidationError.invalid("account s")) {
+        try SettingsPage([SettingsSection("a", rows: [.account("s", "S", provider: "")])]).validate()
+    }
+}

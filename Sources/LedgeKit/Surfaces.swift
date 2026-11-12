@@ -10,12 +10,17 @@ import Foundation
 public enum Surface {
     public static let settingsPage = "settings-page"
     public static let widget = "widget"
+    /// A button in Ledge's players, such as a heart for liking the playing song.
+    public static let playerAction = "player-action"
 
     /// Update topics an add-on sends surfaces on.
     public static let settingsTopic = "surface.settings-page"
     public static let widgetsTopic = "surface.widgets"
+    public static let playerActionsTopic = "surface.player-actions"
     /// The request Ledge sends when the user acts on a control.
     public static let eventMethod = "ledge.surfaceEvent"
+    /// The request Ledge sends to read or set a player action's state for a song. See `PlayerActionRequest`.
+    public static let playerActionMethod = "ledge.playerAction"
 
     /// Limits Ledge enforces before drawing anything.
     public static let maximumRows = 200
@@ -23,6 +28,7 @@ public enum Surface {
     public static let maximumNodes = 100
     public static let maximumDepth = 6
     public static let maximumText = 1000
+    public static let maximumPlayerActions = 4
 }
 
 // MARK: Settings page
@@ -73,6 +79,9 @@ public struct SettingsRow: Codable, Sendable, Equatable {
         case value(text: String)
         /// The row's title as a paragraph, no control.
         case note
+        /// Ledge's own sign-in for an account it manages, such as `spotify`. The credentials stay in Ledge;
+        /// the add-on uses the account through `LedgeHost.request`. Needs LedgeKit 0.7.0.
+        case account(provider: String)
     }
 
     public struct Option: Codable, Sendable, Equatable {
@@ -109,6 +118,66 @@ public struct SettingsRow: Codable, Sendable, Equatable {
     }
     public static func note(_ id: String, _ text: String) -> SettingsRow {
         SettingsRow(id, title: text, control: .note)
+    }
+    public static func account(_ id: String, _ title: String, provider: String) -> SettingsRow {
+        SettingsRow(id, title: title, control: .account(provider: provider))
+    }
+}
+
+// MARK: Player action
+
+/// A button Ledge puts in its players (notch, menu bar, floating player, lock screen) while a song from one of
+/// `sources` plays. Ledge draws it in its own place, with its own layout and focus; the add-on decides whether it
+/// is selected for each song. Ledge asks with a `PlayerActionRequest` and draws `selectedSymbol` while the add-on
+/// says true.
+public struct PlayerAction: Codable, Sendable, Equatable {
+    public var id: String
+    /// Read by VoiceOver and shown as the button's tooltip.
+    public var label: String
+    public var symbol: String
+    public var selectedSymbol: String
+    /// Bundle ids of the players it applies to, such as `com.spotify.client`.
+    public var sources: [String]
+
+    public init(_ id: String, label: String, symbol: String, selectedSymbol: String, sources: [String]) {
+        self.id = id
+        self.label = label
+        self.symbol = symbol
+        self.selectedSymbol = selectedSymbol
+        self.sources = sources
+    }
+}
+
+/// The song a player action is asked about.
+public struct PlayerTrack: Codable, Sendable, Equatable {
+    /// The player's bundle id.
+    public var source: String
+    /// The player's own id for the song, when it gives one, such as a Spotify track id.
+    public var id: String?
+    public var title: String
+    public var artist: String?
+    public var album: String?
+
+    public init(source: String, id: String? = nil, title: String, artist: String? = nil, album: String? = nil) {
+        self.source = source
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.album = album
+    }
+}
+
+/// Ledge asks for a player action's state for a song (`set` is nil), or the user pressed it (`set` is the state
+/// they asked for). Answer the state after it, or nil when it isn't known, which Ledge draws as unavailable.
+public struct PlayerActionRequest: Codable, Sendable, Equatable {
+    public var action: String
+    public var track: PlayerTrack
+    public var set: Bool?
+
+    public init(action: String, track: PlayerTrack, set: Bool? = nil) {
+        self.action = action
+        self.track = track
+        self.set = set
     }
 }
 
@@ -218,6 +287,8 @@ extension SettingsPage {
                     try checkText(placeholder)
                 case let .value(text):
                     try checkText(text)
+                case let .account(provider):
+                    guard !provider.isEmpty, provider.count <= 64 else { throw SurfaceValidationError.invalid("account \(row.id)") }
                 default:
                     break
                 }
@@ -253,6 +324,23 @@ extension Widget {
             }
         }
         try walk(content, depth: 1)
+    }
+}
+
+extension PlayerAction {
+    /// The checks Ledge runs before showing a set of player actions.
+    public static func validate(_ actions: [PlayerAction]) throws {
+        guard actions.count <= Surface.maximumPlayerActions else { throw SurfaceValidationError.tooLarge("\(actions.count) player actions") }
+        var ids = Set<String>()
+        for action in actions {
+            guard !action.id.isEmpty, ids.insert(action.id).inserted else { throw SurfaceValidationError.duplicateID(action.id) }
+            guard !action.label.isEmpty, action.label.count <= 100 else { throw SurfaceValidationError.invalid("label of \(action.id)") }
+            guard !action.symbol.isEmpty, !action.selectedSymbol.isEmpty, action.symbol.count <= 100, action.selectedSymbol.count <= 100
+            else { throw SurfaceValidationError.invalid("symbol of \(action.id)") }
+            guard !action.sources.isEmpty, action.sources.count <= 8,
+                  action.sources.allSatisfy({ !$0.isEmpty && $0.count <= 255 && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" } })
+            else { throw SurfaceValidationError.invalid("sources of \(action.id)") }
+        }
     }
 }
 

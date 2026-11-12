@@ -127,3 +127,25 @@ private let hello = SessionMessage.hello(protocolVersion: 2, apiLevel: SessionPr
     let (_, out) = await session(handlers, messages: [hello, .request(id: 9, method: SessionProtocol.Method.prepareForRemoval, params: .null)])
     #expect(out.contains(.response(id: 9, result: .bool(false), error: nil)))
 }
+
+@Test func playerActionsAnswerTheirStateOrNull() async throws {
+    var handlers = AddOnHandlers()
+    handlers.onPlayerAction = { request in
+        guard request.action == "like", let id = request.track.id else { throw AddOnError("Unknown song.") }
+        return id == "unknown" ? nil : (request.set ?? (id == "liked"))
+    }
+    func ask(_ id: Int, _ track: String, set: Bool? = nil) throws -> SessionMessage {
+        .request(id: id, method: Surface.playerActionMethod, params: try JSONValue(encoding:
+            PlayerActionRequest(action: "like", track: PlayerTrack(source: "com.spotify.client", id: track, title: "Song"), set: set)))
+    }
+    let (status, out) = await session(handlers, messages: [
+        hello,
+        .request(id: 1, method: SessionProtocol.Method.activate, params: .null),
+        try ask(2, "liked"), try ask(3, "other"), try ask(4, "other", set: true), try ask(5, "unknown")
+    ])
+    #expect(status == 0)
+    #expect(out.contains(.response(id: 2, result: .bool(true), error: nil)))
+    #expect(out.contains(.response(id: 3, result: .bool(false), error: nil)))
+    #expect(out.contains(.response(id: 4, result: .bool(true), error: nil)))
+    #expect(out.contains(.response(id: 5, result: .null, error: nil)))
+}

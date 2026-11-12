@@ -19,10 +19,23 @@ public struct AddOnHandlers: Sendable {
     public var prepareForRemoval: @Sendable () async -> Bool = { true }
     /// The user acted on a control in one of the add-on's surfaces. Events arrive in order, one at a time.
     public var onEvent: @Sendable (SurfaceEvent) async -> Void = { _ in }
+    /// Ledge asks a player action's state for a song, or the user pressed it. Return the state after it, or nil
+    /// when it isn't known. Requests run side by side, like other methods. Throw `AddOnError` to say why it failed.
+    public var onPlayerAction: @Sendable (PlayerActionRequest) async throws -> Bool? = { _ in nil }
 
     var methods: [String: @Sendable (JSONValue) async throws -> JSONValue] = [:]
 
     public init() {}
+
+    /// The handler for a request method: the player action handler for Ledge's player requests, else the add-on's own.
+    func handler(for method: String) -> (@Sendable (JSONValue) async throws -> JSONValue)? {
+        guard method == Surface.playerActionMethod else { return methods[method] }
+        let onPlayerAction = self.onPlayerAction
+        return { params in
+            guard let state = try await onPlayerAction(try params.decode(PlayerActionRequest.self)) else { return .null }
+            return .bool(state)
+        }
+    }
 
     /// Handles one request method with your own `Codable` types. Methods starting `ledge.` are reserved.
     public mutating func on<Request: Decodable & Sendable, Response: Encodable & Sendable>(
@@ -68,6 +81,12 @@ public enum AddOnSession {
     public static func show(widgets: [Widget]) {
         guard let payload = try? JSONValue(encoding: widgets) else { return }
         update(topic: Surface.widgetsTopic, payload: payload)
+    }
+
+    /// Shows the add-on's buttons in Ledge's players. The manifest must declare `player-action`.
+    public static func show(playerActions: [PlayerAction]) {
+        guard let payload = try? JSONValue(encoding: playerActions) else { return }
+        update(topic: Surface.playerActionsTopic, payload: payload)
     }
 
     /// Sends state for a surface or service by topic. `show(_:)` and `show(widgets:)` cover the surfaces.
@@ -161,7 +180,7 @@ public enum AddOnSession {
                     await handlers.onEvent(event)
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 default:
-                    guard active, let handler = handlers.methods[method] else {
+                    guard active, let handler = handlers.handler(for: method) else {
                         await send(.response(id: requestID, result: nil,
                                              error: active ? "This add-on doesn't handle \(method)." : "The add-on isn't active."))
                         continue
