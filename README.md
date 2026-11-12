@@ -158,6 +158,26 @@ handlers.onPlayerQueue = { request in
 - `show(player: nil)` removes both. Throw `AddOnError` from `onPlayerQueue` with a reason, and Ledge shows it in
   place of the list.
 
+## Live activities beside the notch (0.10.0)
+
+Declare `"activity"` in `surfaces`, then show the activities you have up; each send replaces the last:
+
+```swift
+AddOnSession.show(activities: [
+    LiveActivity("countdown", symbol: "timer", text: "4:59", progress: .fraction(0.2), importance: .high)
+])
+AddOnSession.show(activities: [])                       // take them down
+handlers.onActivityPlacement = { change in               // center, side, outranked, suppressed or idle
+    if change.placement == .suppressed { stopSending() }
+}
+```
+
+- Ledge's own activities (volume, charging, media…) always come first; yours takes the centre only when none of
+  Ledge's is up, and otherwise a side pill or nothing. Up to two activities, 60 characters of text each.
+- `lasts:` takes an activity down after that many seconds (1–600); without it, it stays until you take it down.
+  Take it down as soon as it has nothing to say.
+- Users can turn an add-on's activities off on its page; you're told `.suppressed`. `Examples/Timer` shows it all.
+
 ## Implement a worker (protocol 1)
 
 ```swift

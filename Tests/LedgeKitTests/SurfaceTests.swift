@@ -111,3 +111,17 @@ private actor Seen {
     #expect(throws: (any Error).self) { try PlayerQueueEntry.validate([PlayerQueueEntry(title: "Song", artist: "", storeID: "12a")]) }
     #expect(throws: (any Error).self) { try PlayerMenu.Item.validate([PlayerMenu.Item("", title: "x")]) }
 }
+
+@Test func liveActivitiesValidateAndRoundTrip() throws {
+    let timer = LiveActivity("timer", symbol: "timer", text: "4:59", progress: .fraction(0.2), importance: .high)
+    try LiveActivity.validate([timer])
+    #expect(try JSONDecoder().decode([LiveActivity].self, from: JSONEncoder().encode([timer])) == [timer])
+    #expect(LiveActivity.Importance.low < .normal && LiveActivity.Importance.normal < .high)
+    #expect(throws: (any Error).self) { try LiveActivity.validate([timer, timer]) }
+    #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: String(repeating: "x", count: 61))]) }
+    #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "y", progress: .fraction(2))]) }
+    #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "y", lasts: 0)]) }
+    #expect(throws: (any Error).self) {
+        try LiveActivity.validate((0..<3).map { LiveActivity("a\($0)", symbol: "x", text: "y") })
+    }
+}

@@ -14,12 +14,15 @@ public enum Surface {
     public static let playerAction = "player-action"
     /// A ••• menu entry and Playing Next in Ledge's players, for the players an add-on covers.
     public static let player = "player"
+    /// A live activity beside the notch.
+    public static let activity = "activity"
 
     /// Update topics an add-on sends surfaces on.
     public static let settingsTopic = "surface.settings-page"
     public static let widgetsTopic = "surface.widgets"
     public static let playerActionsTopic = "surface.player-actions"
     public static let playerTopic = "surface.player"
+    public static let activitiesTopic = "surface.activities"
     /// The request Ledge sends when the user acts on a control.
     public static let eventMethod = "ledge.surfaceEvent"
     /// The request Ledge sends to read or set a player action's state for a song. See `PlayerActionRequest`.
@@ -29,6 +32,10 @@ public enum Surface {
     public static let playerQueueMethod = "ledge.playerQueue"
     public static let maximumMenuItems = 500
     public static let maximumQueueEntries = 50
+    /// The request Ledge sends when an activity's place beside the notch changes. See `ActivityPlacementChange`.
+    public static let activityPlacementMethod = "ledge.activityPlacement"
+    public static let maximumActivities = 2
+    public static let maximumActivityText = 60
 
     /// Limits Ledge enforces before drawing anything.
     public static let maximumRows = 200
@@ -273,6 +280,75 @@ public struct PlayerQueueEntry: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: Live activity
+
+/// A compact row beside the notch, like Ledge's own volume or charging activities: a symbol, a short text and an
+/// optional progress ring. Show the add-on's current activities with `AddOnSession.show(activities:)`; each send
+/// replaces the last, and an activity left out is taken down. Declare `"activity"` in the manifest's surfaces.
+///
+/// Ledge's own activities always come first: an add-on's activity takes the centre only when nothing of Ledge's is
+/// showing, and otherwise a side pill or nothing. Ledge says where each one is with `onActivityPlacement`. Take an
+/// activity down as soon as it has nothing to say.
+public struct LiveActivity: Codable, Sendable, Equatable {
+    public var id: String
+    public var symbol: String
+    /// Up to 60 characters; keep it to a few words.
+    public var text: String
+    public var progress: Progress?
+    public var importance: Importance
+    /// Seconds it stays after this send, or nil to stay until the add-on takes it down.
+    public var lasts: Double?
+
+    public init(_ id: String, symbol: String, text: String, progress: Progress? = nil,
+                importance: Importance = .normal, lasts: Double? = nil) {
+        self.id = id
+        self.symbol = symbol
+        self.text = text
+        self.progress = progress
+        self.importance = importance
+        self.lasts = lasts
+    }
+
+    public enum Progress: Codable, Sendable, Equatable {
+        case indeterminate
+        case fraction(Double)
+        case done
+    }
+
+    /// Orders an add-on's activity among other add-ons'. All of them rank below Ledge's own.
+    public enum Importance: String, Codable, Sendable, Comparable {
+        case low, normal, high
+        public static func < (a: Importance, b: Importance) -> Bool {
+            let order: [Importance] = [.low, .normal, .high]
+            return order.firstIndex(of: a)! < order.firstIndex(of: b)!
+        }
+    }
+}
+
+/// Where an activity is now.
+public enum ActivityPlacement: String, Codable, Sendable, Equatable {
+    /// In the centre, beside the notch.
+    case center
+    /// In a side pill, next to a higher-ranked activity.
+    case side
+    /// Waiting: higher-ranked activities fill every place.
+    case outranked
+    /// The user turned off this add-on's activities; Ledge won't show them.
+    case suppressed
+    /// Not up: it ended, ran out its time, or was taken down.
+    case idle
+}
+
+/// Sent to `AddOnHandlers.onActivityPlacement` when an activity's place changes.
+public struct ActivityPlacementChange: Codable, Sendable, Equatable {
+    public var activity: String
+    public var placement: ActivityPlacement
+    public init(activity: String, placement: ActivityPlacement) {
+        self.activity = activity
+        self.placement = placement
+    }
+}
+
 // MARK: Widget
 
 /// A tile on the Widgets page of the open notch.
@@ -471,6 +547,25 @@ extension PlayerQueueEntry {
             if let url = entry.artworkURL {
                 guard url.count <= 4096, URL(string: url)?.scheme == "https" else { throw SurfaceValidationError.invalid("queue artwork") }
             }
+        }
+    }
+}
+
+extension LiveActivity {
+    /// The checks Ledge runs before showing an add-on's activities.
+    public static func validate(_ activities: [LiveActivity]) throws {
+        guard activities.count <= Surface.maximumActivities else { throw SurfaceValidationError.tooLarge("\(activities.count) activities") }
+        var ids = Set<String>()
+        for activity in activities {
+            guard !activity.id.isEmpty, activity.id.count <= 64, ids.insert(activity.id).inserted
+            else { throw SurfaceValidationError.duplicateID(activity.id) }
+            guard !activity.symbol.isEmpty, activity.symbol.count <= 100 else { throw SurfaceValidationError.invalid("symbol of \(activity.id)") }
+            guard !activity.text.isEmpty, activity.text.count <= Surface.maximumActivityText
+            else { throw SurfaceValidationError.invalid("text of \(activity.id)") }
+            if case .fraction(let value)? = activity.progress, !(0...1).contains(value) {
+                throw SurfaceValidationError.invalid("progress of \(activity.id)")
+            }
+            if let lasts = activity.lasts, !(1...600).contains(lasts) { throw SurfaceValidationError.invalid("lasts of \(activity.id)") }
         }
     }
 }
