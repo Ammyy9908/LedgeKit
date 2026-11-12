@@ -19,6 +19,9 @@ public struct AddOnHandlers: Sendable {
     public var prepareForRemoval: @Sendable () async -> Bool = { true }
     /// The user acted on a control in one of the add-on's surfaces. Events arrive in order, one at a time.
     public var onEvent: @Sendable (SurfaceEvent) async -> Void = { _ in }
+    /// Ledge's environment changed: light or dark, the accent colour, a screen with a notch. The same value
+    /// `LedgeHost.environment()` returns. Runs in order with events.
+    public var onEnvironmentChange: @Sendable (HostEnvironment) async -> Void = { _ in }
     /// Ledge asks a player action's state for a song, or the user pressed it. Return the state after it, or nil
     /// when it isn't known. Requests run side by side, like other methods. Throw `AddOnError` to say why it failed.
     public var onPlayerAction: @Sendable (PlayerActionRequest) async throws -> Bool? = { _ in nil }
@@ -193,6 +196,13 @@ public enum AddOnSession {
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case SessionProtocol.Method.prepareForRemoval:
                     await send(.response(id: requestID, result: .bool(await handlers.prepareForRemoval()), error: nil))
+                case SessionProtocol.Method.environmentChanged:
+                    guard active, let environment = try? params.decode(HostEnvironment.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the environment."))
+                        continue
+                    }
+                    await handlers.onEnvironmentChange(environment)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
                 case Surface.eventMethod:
                     // Events run in order, before anything sent after them.
                     guard active, let event = try? params.decode(SurfaceEvent.self) else {

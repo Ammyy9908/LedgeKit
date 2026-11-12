@@ -171,3 +171,23 @@ private let hello = SessionMessage.hello(protocolVersion: 2, apiLevel: SessionPr
     #expect(out.contains(.response(id: 3, result: .array([]), error: nil)))
     #expect(out.contains(.response(id: 4, result: try JSONValue(encoding: [PlayerQueueEntry(id: "2", title: "Moved", artist: "Someone")]), error: nil)))
 }
+
+@Test func environmentChangesReachTheAddOn() async throws {
+    let seen = Seen()
+    var handlers = AddOnHandlers()
+    handlers.onEnvironmentChange = { environment in await seen.add(environment.appearance) }
+    let dark = HostEnvironment(ledgeVersion: "1.0", apiLevel: SessionProtocol.apiLevel, appearance: "dark", accentColor: "#0A84FF", hasNotch: true)
+    let (status, out) = await session(handlers, messages: [
+        hello,
+        .request(id: 1, method: SessionProtocol.Method.activate, params: .null),
+        .request(id: 2, method: SessionProtocol.Method.environmentChanged, params: try JSONValue(encoding: dark))
+    ])
+    #expect(status == 0)
+    #expect(out.contains(.response(id: 2, result: .bool(true), error: nil)))
+    #expect(await seen.all == ["dark"])
+}
+
+private actor Seen {
+    var all: [String] = []
+    func add(_ value: String) { all.append(value) }
+}

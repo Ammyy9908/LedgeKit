@@ -105,6 +105,8 @@ handlers.onEvent = { event in
   Ledge to call the provider with the user's credentials. Ledge allows only the endpoints it lists for the
   capability you were granted (for Spotify, `spotify-library`: the library's contains, save and remove), adds the
   credentials itself, and returns the status and body. Your add-on never receives a token.
+- Ledge tells you when its environment changes (light or dark, the accent colour, displays), from 0.9.0:
+  `handlers.onEnvironmentChange = { environment in … }` gets the same value `environment()` returns.
 - Stored settings are per add-on: keys up to 128 characters, all values together up to 256 KB. They survive
   restarts, updates, and removing and reinstalling the add-on.
 - A call Ledge refuses throws `LedgeHostError` with the reason, for example a capability the user didn't grant.
