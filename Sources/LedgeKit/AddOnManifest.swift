@@ -192,7 +192,8 @@ extension AddOnManifest {
 public enum AddOnCapability {
     /// Capabilities this LedgeKit release documents. Not exhaustive at runtime: a newer package may name one a host
     /// has never heard of, which loads and is treated as not granted.
-    public static let known: Set<String> = ["spotify-library", "notification-banners", "apple-music-queue", "apple-music-controls"]
+    public static let known: Set<String> = ["spotify-library", "notification-banners", "apple-music-queue", "apple-music-controls",
+                                            "clipboard-write", "hud"]
 
     public static func isWellFormed(_ name: String) -> Bool {
         (1...64).contains(name.count) && name.allSatisfy { $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-") }

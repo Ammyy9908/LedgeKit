@@ -44,6 +44,7 @@ private let hello = SessionMessage.hello(protocolVersion: 2, apiLevel: SessionPr
         .request(id: 3, method: "echo", params: .object(["text": .string("line\nbreak")])),
         .response(id: 3, result: .array([.null, .bool(true), .number(1.5)]), error: nil),
         .response(id: 4, result: nil, error: "Nope"),
+        .response(id: 5, result: .null, error: nil),
         .log(level: .info, message: "hi"),
         .update(topic: "widget", payload: .object([:]))
     ]

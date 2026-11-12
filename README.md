@@ -82,6 +82,34 @@ handlers.onEvent = { event in
 - Ledge draws only surfaces the manifest declares, and refuses descriptions over its limits (200 rows, 8 widgets,
   100 parts and 6 levels per widget, 1,000 characters per text).
 
+## Ask Ledge for things (host services, 0.6.0)
+
+A session add-on can call Ledge through `LedgeHost`, from any handler, including `activate`:
+
+```swift
+struct Choices: Codable { var units: String }
+handlers.activate = {
+    let saved = try? await LedgeHost.value(Choices.self, forKey: "choices")   // kept across restarts and updates
+    let environment = try await LedgeHost.environment()                      // Ledge version, light or dark, accent, notch
+    try await LedgeHost.set(Choices(units: "km"), forKey: "choices")
+}
+handlers.onEvent = { event in
+    try? await LedgeHost.open(URL(string: "https://example.com")!)            // https, http and mailto only
+    try? await LedgeHost.copy("Copied from my add-on")                       // needs "clipboard-write"
+    try? await LedgeHost.notify(title: "Done", message: "It worked")         // needs "hud"
+}
+```
+
+- Accounts Ledge manages: `LedgeHost.account("spotify")` says whether the user is connected, and
+  `LedgeHost.request(provider: "spotify", method: "GET", path: "/v1/me/library/contains", query: ["uris": …])` asks
+  Ledge to call the provider with the user's credentials. Ledge allows only the endpoints it lists for the
+  capability you were granted (for Spotify, `spotify-library`: the library's contains, save and remove), adds the
+  credentials itself, and returns the status and body. Your add-on never receives a token.
+- Stored settings are per add-on: keys up to 128 characters, all values together up to 256 KB. They survive
+  restarts, updates, and removing and reinstalling the add-on.
+- A call Ledge refuses throws `LedgeHostError` with the reason, for example a capability the user didn't grant.
+  Handle it: capabilities can be off. Calls Ledge doesn't answer within 10 seconds throw too.
+
 ## Implement a worker (protocol 1)
 
 ```swift

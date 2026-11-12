@@ -83,15 +83,46 @@ public enum AddOnSession {
         id: String, handlers: AddOnHandlers,
         input: AsyncThrowingStream<Data, Error>, write: @escaping @Sendable (Data) async -> Void
     ) async -> Int32 {
+        let calls = HostCalls(writer: write)
+        let status = await HostCalls.$current.withValue(calls) {
+            await loop(id: id, handlers: handlers, input: input, write: write, calls: calls)
+        }
+        await calls.endSession()
+        return status
+    }
+
+    private static func loop(
+        id: String, handlers: AddOnHandlers, input: AsyncThrowingStream<Data, Error>,
+        write: @escaping @Sendable (Data) async -> Void, calls: HostCalls
+    ) async -> Int32 {
         func send(_ message: SessionMessage) async {
             if let line = try? message.encodedLine() { await write(line) }
         }
+        // Calls the add-on makes to Ledge (LedgeHost) go out on the same output. Ledge's answers to them are taken
+        // off the input as they arrive, so a handler waiting on one (in activate, say) never blocks the loop that
+        // reads it.
+        let (messages, forward) = AsyncThrowingStream<Data, Error>.makeStream()
+        let pump = Task {
+            do {
+                for try await line in input {
+                    if case let .response(id, result, error)? = try? JSONDecoder().decode(SessionMessage.self, from: line) {
+                        await calls.resolve(id, result: result, error: error)
+                    } else {
+                        forward.yield(line)
+                    }
+                }
+                forward.finish()
+            } catch {
+                forward.finish(throwing: error)
+            }
+        }
+        defer { pump.cancel() }
         var greeted = false
         var active = false
         var running: [Task<Void, Never>] = []
         defer { running.forEach { $0.cancel() } }
         do {
-            for try await line in input {
+            for try await line in messages {
                 guard let message = try? JSONDecoder().decode(SessionMessage.self, from: line) else {
                     await send(.log(level: .error, message: "Ledge sent a message this add-on can't read; ending the session."))
                     return protocolFailure
