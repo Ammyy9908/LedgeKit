@@ -110,6 +110,28 @@ handlers.onEvent = { event in
 - A call Ledge refuses throws `LedgeHostError` with the reason, for example a capability the user didn't grant.
   Handle it: capabilities can be off. Calls Ledge doesn't answer within 10 seconds throw too.
 
+## A button in Ledge's players (player actions, 0.7.0)
+
+Declare `"player-action"` in the manifest's `surfaces`, show the button, and answer its state per song:
+
+```swift
+let heart = PlayerAction("like", label: "Like", symbol: "heart", selectedSymbol: "heart.fill",
+                         sources: ["com.spotify.client"])
+handlers.activate = { AddOnSession.show(playerActions: [heart]) }
+handlers.onPlayerAction = { request in
+    guard let id = request.track.id else { return nil }        // nil: unknown, drawn dimmed
+    if let liked = request.set { return try await setLiked(liked, id) }
+    return try await isLiked(id)
+}
+```
+
+- Ledge draws the button in the notch, menu bar, floating and lock screen players while a song from one of
+  `sources` plays, and decides where it goes. Up to 4 actions per add-on.
+- `request.set` is nil when Ledge asks the state, and the state the user chose when they press it. Answer the
+  state after it. A press while the state is unknown opens your settings page instead.
+- A settings row `.account("spotify", "Spotify", provider: "spotify")` shows Ledge's own sign-in for an account it
+  manages, so users sign in from your page while the credentials stay in Ledge.
+
 ## Implement a worker (protocol 1)
 
 ```swift
