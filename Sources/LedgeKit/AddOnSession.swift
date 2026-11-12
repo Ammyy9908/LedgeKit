@@ -19,6 +19,9 @@ public struct AddOnHandlers: Sendable {
     public var prepareForRemoval: @Sendable () async -> Bool = { true }
     /// The user acted on a control in one of the add-on's surfaces. Events arrive in order, one at a time.
     public var onEvent: @Sendable (SurfaceEvent) async -> Void = { _ in }
+    /// One of the add-on's live activities moved: to the centre, a side pill, waiting, turned off, or down.
+    /// Runs in order with events.
+    public var onActivityPlacement: @Sendable (ActivityPlacementChange) async -> Void = { _ in }
     /// Ledge's environment changed: light or dark, the accent colour, a screen with a notch. The same value
     /// `LedgeHost.environment()` returns. Runs in order with events.
     public var onEnvironmentChange: @Sendable (HostEnvironment) async -> Void = { _ in }
@@ -106,6 +109,13 @@ public enum AddOnSession {
     public static func show(playerActions: [PlayerAction]) {
         guard let payload = try? JSONValue(encoding: playerActions) else { return }
         update(topic: Surface.playerActionsTopic, payload: payload)
+    }
+
+    /// Shows the add-on's live activities beside the notch, replacing the last set; an empty list takes them all down.
+    /// Declare `activity` in the manifest's surfaces.
+    public static func show(activities: [LiveActivity]) {
+        guard let payload = try? JSONValue(encoding: activities) else { return }
+        update(topic: Surface.activitiesTopic, payload: payload)
     }
 
     /// Shows the add-on's player menu and Playing Next, or removes them with nil. Declare `player` in the manifest.
@@ -196,6 +206,13 @@ public enum AddOnSession {
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case SessionProtocol.Method.prepareForRemoval:
                     await send(.response(id: requestID, result: .bool(await handlers.prepareForRemoval()), error: nil))
+                case Surface.activityPlacementMethod:
+                    guard active, let change = try? params.decode(ActivityPlacementChange.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the placement."))
+                        continue
+                    }
+                    await handlers.onActivityPlacement(change)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
                 case SessionProtocol.Method.environmentChanged:
                     guard active, let environment = try? params.decode(HostEnvironment.self) else {
                         await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the environment."))

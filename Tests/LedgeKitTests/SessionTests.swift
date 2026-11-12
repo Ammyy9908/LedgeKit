@@ -191,3 +191,19 @@ private actor Seen {
     var all: [String] = []
     func add(_ value: String) { all.append(value) }
 }
+
+@Test func activityPlacementsReachTheAddOnInOrder() async throws {
+    let seen = Seen()
+    var handlers = AddOnHandlers()
+    handlers.onActivityPlacement = { change in await seen.add("\(change.activity):\(change.placement.rawValue)") }
+    let changes = [ActivityPlacementChange(activity: "timer", placement: .center),
+                   ActivityPlacementChange(activity: "timer", placement: .outranked),
+                   ActivityPlacementChange(activity: "timer", placement: .idle)]
+    var messages: [SessionMessage] = [hello, .request(id: 1, method: SessionProtocol.Method.activate, params: .null)]
+    for (offset, change) in changes.enumerated() {
+        messages.append(.request(id: 10 + offset, method: Surface.activityPlacementMethod, params: try JSONValue(encoding: change)))
+    }
+    let (status, _) = await session(handlers, messages: messages)
+    #expect(status == 0)
+    #expect(await seen.all == ["timer:center", "timer:outranked", "timer:idle"])
+}
