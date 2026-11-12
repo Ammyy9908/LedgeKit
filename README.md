@@ -132,6 +132,30 @@ handlers.onPlayerAction = { request in
 - A settings row `.account("spotify", "Spotify", provider: "spotify")` shows Ledge's own sign-in for an account it
   manages, so users sign in from your page while the credentials stay in Ledge.
 
+## A player menu and Playing Next (player extensions, 0.8.0)
+
+Declare `"player"` in `surfaces` and say which players you cover:
+
+```swift
+AddOnSession.show(player: PlayerExtension(sources: ["com.apple.Music"],
+                                          menu: PlayerMenu("playlists", title: "Add to Playlist", symbol: "text.badge.plus"),
+                                          queue: true))
+handlers.onPlayerMenu = { request in
+    if let id = request.choose { try await add(to: id); return [] }   // the user picked an item
+    return try await playlists().map { PlayerMenu.Item($0.id, title: $0.name) }
+}
+handlers.onPlayerQueue = { request in
+    if let id = request.playNext { try await playNext(id) }           // the user picked an upcoming song
+    return try await upcoming()                                         // [PlayerQueueEntry], up to 50
+}
+```
+
+- The menu entry appears in the player's ••• menu and lists your items when it opens. Playing Next appears in the
+  notch, menu bar and lock screen players; Ledge loads each entry's artwork from its https `artworkURL`, or by its
+  Apple `storeID`.
+- `show(player: nil)` removes both. Throw `AddOnError` from `onPlayerQueue` with a reason, and Ledge shows it in
+  place of the list.
+
 ## Implement a worker (protocol 1)
 
 ```swift
