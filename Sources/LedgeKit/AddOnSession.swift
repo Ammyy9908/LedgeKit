@@ -17,10 +17,44 @@ public struct AddOnHandlers: Sendable {
     public var deactivate: @Sendable () async -> Void = {}
     /// Return `false` to refuse a removal that would lose something, such as a transfer in flight.
     public var prepareForRemoval: @Sendable () async -> Bool = { true }
+    /// The user acted on a control in one of the add-on's surfaces. Events arrive in order, one at a time.
+    public var onEvent: @Sendable (SurfaceEvent) async -> Void = { _ in }
+    /// Ledge's environment changed: light or dark, the accent colour, a screen with a notch. The same value
+    /// `LedgeHost.environment()` returns. Runs in order with events.
+    public var onEnvironmentChange: @Sendable (HostEnvironment) async -> Void = { _ in }
+    /// Ledge asks a player action's state for a song, or the user pressed it. Return the state after it, or nil
+    /// when it isn't known. Requests run side by side, like other methods. Throw `AddOnError` to say why it failed.
+    public var onPlayerAction: @Sendable (PlayerActionRequest) async throws -> Bool? = { _ in nil }
+    /// Ledge opened the player menu from `show(player:)`, or the user picked one of its items.
+    public var onPlayerMenu: @Sendable (PlayerMenuRequest) async throws -> [PlayerMenu.Item] = { _ in [] }
+    /// Ledge wants Playing Next, or the user picked a song to play next.
+    public var onPlayerQueue: @Sendable (PlayerQueueRequest) async throws -> [PlayerQueueEntry] = { _ in
+        throw AddOnError("This add-on doesn't provide Playing Next.")
+    }
 
     var methods: [String: @Sendable (JSONValue) async throws -> JSONValue] = [:]
 
     public init() {}
+
+    /// The handler for a request method: the player action handler for Ledge's player requests, else the add-on's own.
+    func handler(for method: String) -> (@Sendable (JSONValue) async throws -> JSONValue)? {
+        switch method {
+        case Surface.playerActionMethod:
+            let onPlayerAction = self.onPlayerAction
+            return { params in
+                guard let state = try await onPlayerAction(try params.decode(PlayerActionRequest.self)) else { return .null }
+                return .bool(state)
+            }
+        case Surface.playerMenuMethod:
+            let onPlayerMenu = self.onPlayerMenu
+            return { params in try JSONValue(encoding: try await onPlayerMenu(try params.decode(PlayerMenuRequest.self))) }
+        case Surface.playerQueueMethod:
+            let onPlayerQueue = self.onPlayerQueue
+            return { params in try JSONValue(encoding: try await onPlayerQueue(try params.decode(PlayerQueueRequest.self))) }
+        default:
+            return methods[method]
+        }
+    }
 
     /// Handles one request method with your own `Codable` types. Methods starting `ledge.` are reserved.
     public mutating func on<Request: Decodable & Sendable, Response: Encodable & Sendable>(
@@ -56,7 +90,31 @@ public enum AddOnSession {
         Task { await current.send(.log(level: level, message: String(message.prefix(4096)))) }
     }
 
-    /// Sends state for a surface or service. Reserved for the surfaces LedgeKit will add.
+    /// Shows the add-on's settings page, replacing the last one sent. Needs `"settings-page"` in `surfaces`.
+    public static func show(_ page: SettingsPage) {
+        guard let payload = try? JSONValue(encoding: page) else { return }
+        update(topic: Surface.settingsTopic, payload: payload)
+    }
+
+    /// Shows the add-on's widgets, replacing the last ones sent. Needs `"widget"` in `surfaces`.
+    public static func show(widgets: [Widget]) {
+        guard let payload = try? JSONValue(encoding: widgets) else { return }
+        update(topic: Surface.widgetsTopic, payload: payload)
+    }
+
+    /// Shows the add-on's buttons in Ledge's players. The manifest must declare `player-action`.
+    public static func show(playerActions: [PlayerAction]) {
+        guard let payload = try? JSONValue(encoding: playerActions) else { return }
+        update(topic: Surface.playerActionsTopic, payload: payload)
+    }
+
+    /// Shows the add-on's player menu and Playing Next, or removes them with nil. Declare `player` in the manifest.
+    public static func show(player: PlayerExtension?) {
+        guard let payload = try? JSONValue(encoding: player) else { return }
+        update(topic: Surface.playerTopic, payload: payload)
+    }
+
+    /// Sends state for a surface or service by topic. `show(_:)` and `show(widgets:)` cover the surfaces.
     public static func update(topic: String, payload: JSONValue) {
         guard let current else { return }
         Task { await current.send(.update(topic: topic, payload: payload)) }
@@ -69,15 +127,46 @@ public enum AddOnSession {
         id: String, handlers: AddOnHandlers,
         input: AsyncThrowingStream<Data, Error>, write: @escaping @Sendable (Data) async -> Void
     ) async -> Int32 {
+        let calls = HostCalls(writer: write)
+        let status = await HostCalls.$current.withValue(calls) {
+            await loop(id: id, handlers: handlers, input: input, write: write, calls: calls)
+        }
+        await calls.endSession()
+        return status
+    }
+
+    private static func loop(
+        id: String, handlers: AddOnHandlers, input: AsyncThrowingStream<Data, Error>,
+        write: @escaping @Sendable (Data) async -> Void, calls: HostCalls
+    ) async -> Int32 {
         func send(_ message: SessionMessage) async {
             if let line = try? message.encodedLine() { await write(line) }
         }
+        // Calls the add-on makes to Ledge (LedgeHost) go out on the same output. Ledge's answers to them are taken
+        // off the input as they arrive, so a handler waiting on one (in activate, say) never blocks the loop that
+        // reads it.
+        let (messages, forward) = AsyncThrowingStream<Data, Error>.makeStream()
+        let pump = Task {
+            do {
+                for try await line in input {
+                    if case let .response(id, result, error)? = try? JSONDecoder().decode(SessionMessage.self, from: line) {
+                        await calls.resolve(id, result: result, error: error)
+                    } else {
+                        forward.yield(line)
+                    }
+                }
+                forward.finish()
+            } catch {
+                forward.finish(throwing: error)
+            }
+        }
+        defer { pump.cancel() }
         var greeted = false
         var active = false
         var running: [Task<Void, Never>] = []
         defer { running.forEach { $0.cancel() } }
         do {
-            for try await line in input {
+            for try await line in messages {
                 guard let message = try? JSONDecoder().decode(SessionMessage.self, from: line) else {
                     await send(.log(level: .error, message: "Ledge sent a message this add-on can't read; ending the session."))
                     return protocolFailure
@@ -107,8 +196,23 @@ public enum AddOnSession {
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case SessionProtocol.Method.prepareForRemoval:
                     await send(.response(id: requestID, result: .bool(await handlers.prepareForRemoval()), error: nil))
+                case SessionProtocol.Method.environmentChanged:
+                    guard active, let environment = try? params.decode(HostEnvironment.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the environment."))
+                        continue
+                    }
+                    await handlers.onEnvironmentChange(environment)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
+                case Surface.eventMethod:
+                    // Events run in order, before anything sent after them.
+                    guard active, let event = try? params.decode(SurfaceEvent.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the event."))
+                        continue
+                    }
+                    await handlers.onEvent(event)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
                 default:
-                    guard active, let handler = handlers.methods[method] else {
+                    guard active, let handler = handlers.handler(for: method) else {
                         await send(.response(id: requestID, result: nil,
                                              error: active ? "This add-on doesn't handle \(method)." : "The add-on isn't active."))
                         continue

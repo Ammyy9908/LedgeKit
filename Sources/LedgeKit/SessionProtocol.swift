@@ -16,7 +16,7 @@ import Foundation
 public enum SessionProtocol {
     public static let version = 2
     /// The LedgeKit API level this build speaks. Ledge refuses an add-on that needs a newer one.
-    public static let apiLevel = "0.3.0"
+    public static let apiLevel = "0.9.0"
     /// The longest message in either direction, newline excluded.
     public static let maximumMessageBytes = 1_048_576
 
@@ -25,6 +25,8 @@ public enum SessionProtocol {
         public static let activate = "ledge.activate"
         public static let deactivate = "ledge.deactivate"
         public static let prepareForRemoval = "ledge.prepareForRemoval"
+        /// Ledge's environment changed, such as light or dark; the params are the new `HostEnvironment`.
+        public static let environmentChanged = "ledge.environmentChanged"
     }
 }
 
@@ -66,7 +68,9 @@ public enum SessionMessage: Codable, Sendable, Equatable {
             self = .request(id: try c.decode(Int.self, forKey: .id), method: try c.decode(String.self, forKey: .method),
                             params: try c.decodeIfPresent(JSONValue.self, forKey: .params) ?? .null)
         case "response":
-            let result = try c.decodeIfPresent(JSONValue.self, forKey: .result)
+            // A result of JSON null is a result (an unset value, say); only a missing key means there's none.
+            let result: JSONValue? = c.contains(.result)
+                ? (try c.decodeNil(forKey: .result) ? .null : c.decode(JSONValue.self, forKey: .result)) : nil
             let error = try c.decodeIfPresent(String.self, forKey: .error)
             guard (result == nil) != (error == nil) else {
                 throw DecodingError.dataCorruptedError(forKey: .error, in: c, debugDescription: "A response carries a result or an error.")

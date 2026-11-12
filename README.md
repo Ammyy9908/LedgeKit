@@ -49,6 +49,115 @@ exit(await AddOnSession.run(id: "my-addon", handlers: handlers))
   that, and restarts an add-on that crashes, at most three times.
 - Messages are limited to 1 MB. See `SessionProtocol` for the full exchange.
 
+## Put something on screen (surfaces, 0.5.0)
+
+A session add-on describes its surfaces as data; Ledge draws them with its own views. Declare them in addon.json
+(`"surfaces": ["settings-page", "widget"]`), then send them whenever they change:
+
+```swift
+handlers.activate = {
+    AddOnSession.show(SettingsPage([
+        SettingsSection("display", title: "Display", rows: [
+            .toggle("showLit", "Show how much is lit", isOn: true),
+            .picker("units", "Units", options: [.init("km", "Kilometres"), .init("mi", "Miles")], selected: "km"),
+            .button("refresh", "Refresh")
+        ])
+    ]))
+    AddOnSession.show(widgets: [
+        Widget("moon", title: "Moon", symbol: "moon.fill", content: .vstack(spacing: 6, children: [
+            .text("Waxing gibbous", style: .title),
+            .progress(0.78, label: "78% lit"),
+            .button(id: "next", title: "Next full moon", symbol: "calendar")
+        ]))
+    ])
+}
+handlers.onEvent = { event in
+    // event.control is the row or button id; event.action says what happened.
+}
+```
+
+- Settings rows: toggle, picker, slider, text field, button, link, read-only value, note. Widgets: vertical and
+  horizontal stacks, text, SF Symbols, a progress bar, buttons and spacers.
+- Each send replaces the last. Ledge keeps controls whose ids don't change, so a field being typed in isn't reset.
+- Ledge draws only surfaces the manifest declares, and refuses descriptions over its limits (200 rows, 8 widgets,
+  100 parts and 6 levels per widget, 1,000 characters per text).
+
+## Ask Ledge for things (host services, 0.6.0)
+
+A session add-on can call Ledge through `LedgeHost`, from any handler, including `activate`:
+
+```swift
+struct Choices: Codable { var units: String }
+handlers.activate = {
+    let saved = try? await LedgeHost.value(Choices.self, forKey: "choices")   // kept across restarts and updates
+    let environment = try await LedgeHost.environment()                      // Ledge version, light or dark, accent, notch
+    try await LedgeHost.set(Choices(units: "km"), forKey: "choices")
+}
+handlers.onEvent = { event in
+    try? await LedgeHost.open(URL(string: "https://example.com")!)            // https, http and mailto only
+    try? await LedgeHost.copy("Copied from my add-on")                       // needs "clipboard-write"
+    try? await LedgeHost.notify(title: "Done", message: "It worked")         // needs "hud"
+}
+```
+
+- Accounts Ledge manages: `LedgeHost.account("spotify")` says whether the user is connected, and
+  `LedgeHost.request(provider: "spotify", method: "GET", path: "/v1/me/library/contains", query: ["uris": …])` asks
+  Ledge to call the provider with the user's credentials. Ledge allows only the endpoints it lists for the
+  capability you were granted (for Spotify, `spotify-library`: the library's contains, save and remove), adds the
+  credentials itself, and returns the status and body. Your add-on never receives a token.
+- Ledge tells you when its environment changes (light or dark, the accent colour, displays), from 0.9.0:
+  `handlers.onEnvironmentChange = { environment in … }` gets the same value `environment()` returns.
+- Stored settings are per add-on: keys up to 128 characters, all values together up to 256 KB. They survive
+  restarts, updates, and removing and reinstalling the add-on.
+- A call Ledge refuses throws `LedgeHostError` with the reason, for example a capability the user didn't grant.
+  Handle it: capabilities can be off. Calls Ledge doesn't answer within 10 seconds throw too.
+
+## A button in Ledge's players (player actions, 0.7.0)
+
+Declare `"player-action"` in the manifest's `surfaces`, show the button, and answer its state per song:
+
+```swift
+let heart = PlayerAction("like", label: "Like", symbol: "heart", selectedSymbol: "heart.fill",
+                         sources: ["com.spotify.client"])
+handlers.activate = { AddOnSession.show(playerActions: [heart]) }
+handlers.onPlayerAction = { request in
+    guard let id = request.track.id else { return nil }        // nil: unknown, drawn dimmed
+    if let liked = request.set { return try await setLiked(liked, id) }
+    return try await isLiked(id)
+}
+```
+
+- Ledge draws the button in the notch, menu bar, floating and lock screen players while a song from one of
+  `sources` plays, and decides where it goes. Up to 4 actions per add-on.
+- `request.set` is nil when Ledge asks the state, and the state the user chose when they press it. Answer the
+  state after it. A press while the state is unknown opens your settings page instead.
+- A settings row `.account("spotify", "Spotify", provider: "spotify")` shows Ledge's own sign-in for an account it
+  manages, so users sign in from your page while the credentials stay in Ledge.
+
+## A player menu and Playing Next (player extensions, 0.8.0)
+
+Declare `"player"` in `surfaces` and say which players you cover:
+
+```swift
+AddOnSession.show(player: PlayerExtension(sources: ["com.apple.Music"],
+                                          menu: PlayerMenu("playlists", title: "Add to Playlist", symbol: "text.badge.plus"),
+                                          queue: true))
+handlers.onPlayerMenu = { request in
+    if let id = request.choose { try await add(to: id); return [] }   // the user picked an item
+    return try await playlists().map { PlayerMenu.Item($0.id, title: $0.name) }
+}
+handlers.onPlayerQueue = { request in
+    if let id = request.playNext { try await playNext(id) }           // the user picked an upcoming song
+    return try await upcoming()                                         // [PlayerQueueEntry], up to 50
+}
+```
+
+- The menu entry appears in the player's ••• menu and lists your items when it opens. Playing Next appears in the
+  notch, menu bar and lock screen players; Ledge loads each entry's artwork from its https `artworkURL`, or by its
+  Apple `storeID`.
+- `show(player: nil)` removes both. Throw `AddOnError` from `onPlayerQueue` with a reason, and Ledge shows it in
+  place of the list.
+
 ## Implement a worker (protocol 1)
 
 ```swift
