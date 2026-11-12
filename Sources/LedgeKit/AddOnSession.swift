@@ -22,6 +22,12 @@ public struct AddOnHandlers: Sendable {
     /// Ledge asks a player action's state for a song, or the user pressed it. Return the state after it, or nil
     /// when it isn't known. Requests run side by side, like other methods. Throw `AddOnError` to say why it failed.
     public var onPlayerAction: @Sendable (PlayerActionRequest) async throws -> Bool? = { _ in nil }
+    /// Ledge opened the player menu from `show(player:)`, or the user picked one of its items.
+    public var onPlayerMenu: @Sendable (PlayerMenuRequest) async throws -> [PlayerMenu.Item] = { _ in [] }
+    /// Ledge wants Playing Next, or the user picked a song to play next.
+    public var onPlayerQueue: @Sendable (PlayerQueueRequest) async throws -> [PlayerQueueEntry] = { _ in
+        throw AddOnError("This add-on doesn't provide Playing Next.")
+    }
 
     var methods: [String: @Sendable (JSONValue) async throws -> JSONValue] = [:]
 
@@ -29,11 +35,21 @@ public struct AddOnHandlers: Sendable {
 
     /// The handler for a request method: the player action handler for Ledge's player requests, else the add-on's own.
     func handler(for method: String) -> (@Sendable (JSONValue) async throws -> JSONValue)? {
-        guard method == Surface.playerActionMethod else { return methods[method] }
-        let onPlayerAction = self.onPlayerAction
-        return { params in
-            guard let state = try await onPlayerAction(try params.decode(PlayerActionRequest.self)) else { return .null }
-            return .bool(state)
+        switch method {
+        case Surface.playerActionMethod:
+            let onPlayerAction = self.onPlayerAction
+            return { params in
+                guard let state = try await onPlayerAction(try params.decode(PlayerActionRequest.self)) else { return .null }
+                return .bool(state)
+            }
+        case Surface.playerMenuMethod:
+            let onPlayerMenu = self.onPlayerMenu
+            return { params in try JSONValue(encoding: try await onPlayerMenu(try params.decode(PlayerMenuRequest.self))) }
+        case Surface.playerQueueMethod:
+            let onPlayerQueue = self.onPlayerQueue
+            return { params in try JSONValue(encoding: try await onPlayerQueue(try params.decode(PlayerQueueRequest.self))) }
+        default:
+            return methods[method]
         }
     }
 
@@ -87,6 +103,12 @@ public enum AddOnSession {
     public static func show(playerActions: [PlayerAction]) {
         guard let payload = try? JSONValue(encoding: playerActions) else { return }
         update(topic: Surface.playerActionsTopic, payload: payload)
+    }
+
+    /// Shows the add-on's player menu and Playing Next, or removes them with nil. Declare `player` in the manifest.
+    public static func show(player: PlayerExtension?) {
+        guard let payload = try? JSONValue(encoding: player) else { return }
+        update(topic: Surface.playerTopic, payload: payload)
     }
 
     /// Sends state for a surface or service by topic. `show(_:)` and `show(widgets:)` cover the surfaces.

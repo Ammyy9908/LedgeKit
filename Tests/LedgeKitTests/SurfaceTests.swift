@@ -101,3 +101,13 @@ private actor Seen {
         try SettingsPage([SettingsSection("a", rows: [.account("s", "S", provider: "")])]).validate()
     }
 }
+
+@Test func playerExtensionsValidate() throws {
+    try PlayerExtension(sources: ["com.apple.Music"], menu: PlayerMenu("playlists", title: "Add to Playlist", symbol: "text.badge.plus"), queue: true).validate()
+    #expect(throws: (any Error).self) { try PlayerExtension(sources: []).validate() }
+    #expect(throws: (any Error).self) { try PlayerExtension(sources: ["x"], menu: PlayerMenu("m", title: "")).validate() }
+    try PlayerQueueEntry.validate([PlayerQueueEntry(id: "a", title: "Song", artist: "", artworkURL: "https://example.com/a.jpg", storeID: "123")])
+    #expect(throws: (any Error).self) { try PlayerQueueEntry.validate([PlayerQueueEntry(title: "Song", artist: "", artworkURL: "http://example.com/a.jpg")]) }
+    #expect(throws: (any Error).self) { try PlayerQueueEntry.validate([PlayerQueueEntry(title: "Song", artist: "", storeID: "12a")]) }
+    #expect(throws: (any Error).self) { try PlayerMenu.Item.validate([PlayerMenu.Item("", title: "x")]) }
+}

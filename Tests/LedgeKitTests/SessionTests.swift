@@ -149,3 +149,25 @@ private let hello = SessionMessage.hello(protocolVersion: 2, apiLevel: SessionPr
     #expect(out.contains(.response(id: 4, result: .bool(true), error: nil)))
     #expect(out.contains(.response(id: 5, result: .null, error: nil)))
 }
+
+@Test func playerMenusAndQueuesReachTheirHandlers() async throws {
+    var handlers = AddOnHandlers()
+    handlers.onPlayerMenu = { request in
+        request.choose == nil ? [PlayerMenu.Item("p1", title: "Road Trip")] : []
+    }
+    handlers.onPlayerQueue = { request in
+        [PlayerQueueEntry(id: "2", title: request.playNext == nil ? "Next" : "Moved", artist: "Someone")]
+    }
+    let track = PlayerTrack(source: "com.apple.Music", title: "Song")
+    let (status, out) = await session(handlers, messages: [
+        hello,
+        .request(id: 1, method: SessionProtocol.Method.activate, params: .null),
+        .request(id: 2, method: Surface.playerMenuMethod, params: try JSONValue(encoding: PlayerMenuRequest(menu: "playlists", track: track))),
+        .request(id: 3, method: Surface.playerMenuMethod, params: try JSONValue(encoding: PlayerMenuRequest(menu: "playlists", track: track, choose: "p1"))),
+        .request(id: 4, method: Surface.playerQueueMethod, params: try JSONValue(encoding: PlayerQueueRequest(track: track, playNext: "2")))
+    ])
+    #expect(status == 0)
+    #expect(out.contains(.response(id: 2, result: try JSONValue(encoding: [PlayerMenu.Item("p1", title: "Road Trip")]), error: nil)))
+    #expect(out.contains(.response(id: 3, result: .array([]), error: nil)))
+    #expect(out.contains(.response(id: 4, result: try JSONValue(encoding: [PlayerQueueEntry(id: "2", title: "Moved", artist: "Someone")]), error: nil)))
+}

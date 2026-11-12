@@ -12,15 +12,23 @@ public enum Surface {
     public static let widget = "widget"
     /// A button in Ledge's players, such as a heart for liking the playing song.
     public static let playerAction = "player-action"
+    /// A ••• menu entry and Playing Next in Ledge's players, for the players an add-on covers.
+    public static let player = "player"
 
     /// Update topics an add-on sends surfaces on.
     public static let settingsTopic = "surface.settings-page"
     public static let widgetsTopic = "surface.widgets"
     public static let playerActionsTopic = "surface.player-actions"
+    public static let playerTopic = "surface.player"
     /// The request Ledge sends when the user acts on a control.
     public static let eventMethod = "ledge.surfaceEvent"
     /// The request Ledge sends to read or set a player action's state for a song. See `PlayerActionRequest`.
     public static let playerActionMethod = "ledge.playerAction"
+    /// The requests Ledge sends for a `PlayerExtension`'s menu and queue.
+    public static let playerMenuMethod = "ledge.playerMenu"
+    public static let playerQueueMethod = "ledge.playerQueue"
+    public static let maximumMenuItems = 500
+    public static let maximumQueueEntries = 50
 
     /// Limits Ledge enforces before drawing anything.
     public static let maximumRows = 200
@@ -178,6 +186,90 @@ public struct PlayerActionRequest: Codable, Sendable, Equatable {
         self.action = action
         self.track = track
         self.set = set
+    }
+}
+
+// MARK: Player extension
+
+/// More of Ledge's players for the players an add-on covers: an entry in the ••• menu whose choices the add-on
+/// lists when it opens (such as Add to Playlist), and Playing Next. Show it with `AddOnSession.show(player:)`;
+/// declare `"player"` in the manifest's surfaces. Ledge draws both and asks the add-on for their contents.
+public struct PlayerExtension: Codable, Sendable, Equatable {
+    /// Bundle ids of the players it applies to, such as `com.apple.Music`.
+    public var sources: [String]
+    public var menu: PlayerMenu?
+    /// The add-on answers `PlayerQueueRequest`s with the songs after the playing one.
+    public var queue: Bool
+
+    public init(sources: [String], menu: PlayerMenu? = nil, queue: Bool = false) {
+        self.sources = sources
+        self.menu = menu
+        self.queue = queue
+    }
+}
+
+/// An entry in the player's ••• menu that opens a list of choices.
+public struct PlayerMenu: Codable, Sendable, Equatable {
+    public var id: String
+    public var title: String
+    public var symbol: String?
+
+    public init(_ id: String, title: String, symbol: String? = nil) {
+        self.id = id
+        self.title = title
+        self.symbol = symbol
+    }
+
+    public struct Item: Codable, Sendable, Equatable {
+        public var id: String
+        public var title: String
+        public init(_ id: String, title: String) {
+            self.id = id
+            self.title = title
+        }
+    }
+}
+
+/// Ledge opened the menu (`choose` is nil: answer its items), or the user picked an item (`choose` is its id:
+/// do it, and answer the items again or an empty list).
+public struct PlayerMenuRequest: Codable, Sendable, Equatable {
+    public var menu: String
+    public var track: PlayerTrack
+    public var choose: String?
+
+    public init(menu: String, track: PlayerTrack, choose: String? = nil) {
+        self.menu = menu
+        self.track = track
+        self.choose = choose
+    }
+}
+
+/// Ledge wants Playing Next (`playNext` is nil), or the user picked an upcoming song to play next (its id).
+/// Answer the upcoming songs, after the change. Throw `AddOnError` with a reason Ledge can show when there's none.
+public struct PlayerQueueRequest: Codable, Sendable, Equatable {
+    public var track: PlayerTrack
+    public var playNext: String?
+
+    public init(track: PlayerTrack, playNext: String? = nil) {
+        self.track = track
+        self.playNext = playNext
+    }
+}
+
+/// A song in Playing Next. Ledge loads `artworkURL` (https only), or looks the store id up in Apple's catalog.
+public struct PlayerQueueEntry: Codable, Sendable, Equatable {
+    public var id: String?
+    public var title: String
+    public var artist: String
+    public var artworkURL: String?
+    public var storeID: String?
+
+    public init(id: String? = nil, title: String, artist: String, artworkURL: String? = nil, storeID: String? = nil) {
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.artworkURL = artworkURL
+        self.storeID = storeID
     }
 }
 
@@ -340,6 +432,45 @@ extension PlayerAction {
             guard !action.sources.isEmpty, action.sources.count <= 8,
                   action.sources.allSatisfy({ !$0.isEmpty && $0.count <= 255 && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" } })
             else { throw SurfaceValidationError.invalid("sources of \(action.id)") }
+        }
+    }
+}
+
+extension PlayerExtension {
+    /// The checks Ledge runs before using an add-on's player extension.
+    public func validate() throws {
+        guard !sources.isEmpty, sources.count <= 8,
+              sources.allSatisfy({ !$0.isEmpty && $0.count <= 255 && $0.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" } })
+        else { throw SurfaceValidationError.invalid("player sources") }
+        if let menu {
+            guard !menu.id.isEmpty, !menu.title.isEmpty, menu.title.count <= 100, (menu.symbol?.count ?? 0) <= 100
+            else { throw SurfaceValidationError.invalid("player menu") }
+        }
+    }
+}
+
+extension PlayerMenu.Item {
+    /// The checks Ledge runs on each item before showing a menu.
+    public static func validate(_ items: [PlayerMenu.Item]) throws {
+        guard items.count <= Surface.maximumMenuItems else { throw SurfaceValidationError.tooLarge("\(items.count) menu items") }
+        for item in items {
+            guard !item.id.isEmpty, item.id.count <= 1024, !item.title.isEmpty, item.title.count <= 512
+            else { throw SurfaceValidationError.invalid("menu item") }
+        }
+    }
+}
+
+extension PlayerQueueEntry {
+    /// The checks Ledge runs on Playing Next before drawing it.
+    public static func validate(_ entries: [PlayerQueueEntry]) throws {
+        guard entries.count <= Surface.maximumQueueEntries else { throw SurfaceValidationError.tooLarge("\(entries.count) queue entries") }
+        for entry in entries {
+            guard !entry.title.isEmpty, entry.title.count <= 512, entry.artist.count <= 512, (entry.id?.count ?? 0) <= 1024,
+                  (entry.storeID ?? "").allSatisfy({ $0.isASCII && $0.isNumber }), (entry.storeID?.count ?? 0) <= 32
+            else { throw SurfaceValidationError.invalid("queue entry") }
+            if let url = entry.artworkURL {
+                guard url.count <= 4096, URL(string: url)?.scheme == "https" else { throw SurfaceValidationError.invalid("queue artwork") }
+            }
         }
     }
 }
