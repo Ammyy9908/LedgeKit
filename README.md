@@ -178,6 +178,20 @@ handlers.onActivityPlacement = { change in               // center, side, outran
   Take it down as soon as it has nothing to say.
 - Users can turn an add-on's activities off on its page; you're told `.suppressed`. `Examples/Timer` shows it all.
 
+## The lock screen and the menu bar (0.11.0)
+
+```swift
+AddOnSession.show(lockScreenRow: LockScreenRow(symbol: "timer", label: "Timer", value: "4:59"))  // nil takes it down
+AddOnSession.show(menuBarTiles: [MenuBarTile("toggle", symbol: "timer", title: "Start a timer", detail: "1 minute")])
+handlers.onEvent = { event in
+    if event.surface == Surface.menuBarTile, event.control == "toggle" { toggle() }
+}
+```
+
+- Declare `"lock-screen-row"` and `"menu-bar-tile"` in `surfaces`. One lock screen pill per add-on (label up to 30
+  characters, value up to 20), shown under the clock only while the Mac is locked; up to two menu bar tiles, as rows
+  under Ledge's own in its menu bar panel.
+
 ## Implement a worker (protocol 1)
 
 ```swift

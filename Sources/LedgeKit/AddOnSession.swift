@@ -111,6 +111,18 @@ public enum AddOnSession {
         update(topic: Surface.playerActionsTopic, payload: payload)
     }
 
+    /// Shows the add-on's pill on the lock screen, or takes it down with nil. Declare `lock-screen-row` in the manifest.
+    public static func show(lockScreenRow: LockScreenRow?) {
+        guard let payload = try? JSONValue(encoding: lockScreenRow) else { return }
+        update(topic: Surface.lockScreenRowTopic, payload: payload)
+    }
+
+    /// Shows the add-on's rows in the menu bar panel, replacing the last set. Declare `menu-bar-tile` in the manifest.
+    public static func show(menuBarTiles: [MenuBarTile]) {
+        guard let payload = try? JSONValue(encoding: menuBarTiles) else { return }
+        update(topic: Surface.menuBarTilesTopic, payload: payload)
+    }
+
     /// Shows the add-on's live activities beside the notch, replacing the last set; an empty list takes them all down.
     /// Declare `activity` in the manifest's surfaces.
     public static func show(activities: [LiveActivity]) {

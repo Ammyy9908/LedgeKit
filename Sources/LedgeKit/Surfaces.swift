@@ -16,6 +16,10 @@ public enum Surface {
     public static let player = "player"
     /// A live activity beside the notch.
     public static let activity = "activity"
+    /// A pill on the lock screen, under the clock.
+    public static let lockScreenRow = "lock-screen-row"
+    /// A row in the menu bar panel.
+    public static let menuBarTile = "menu-bar-tile"
 
     /// Update topics an add-on sends surfaces on.
     public static let settingsTopic = "surface.settings-page"
@@ -23,6 +27,9 @@ public enum Surface {
     public static let playerActionsTopic = "surface.player-actions"
     public static let playerTopic = "surface.player"
     public static let activitiesTopic = "surface.activities"
+    public static let lockScreenRowTopic = "surface.lock-screen-row"
+    public static let menuBarTilesTopic = "surface.menu-bar-tiles"
+    public static let maximumMenuBarTiles = 2
     /// The request Ledge sends when the user acts on a control.
     public static let eventMethod = "ledge.surfaceEvent"
     /// The request Ledge sends to read or set a player action's state for a song. See `PlayerActionRequest`.
@@ -346,6 +353,65 @@ public struct ActivityPlacementChange: Codable, Sendable, Equatable {
     public init(activity: String, placement: ActivityPlacement) {
         self.activity = activity
         self.placement = placement
+    }
+}
+
+// MARK: Lock screen row
+
+/// A pill on the lock screen, under the clock, like the macOS timer's: a symbol, a label and a value, such as
+/// "Timer 4:59". One per add-on. Ledge shows it only while the Mac is locked; send it whenever it changes, and nil
+/// to take it down. Declare `"lock-screen-row"` in the manifest's surfaces.
+public struct LockScreenRow: Codable, Sendable, Equatable {
+    public var symbol: String
+    /// A word or two, up to 30 characters.
+    public var label: String
+    /// The part to read at a glance, up to 20 characters.
+    public var value: String
+
+    public init(symbol: String, label: String, value: String) {
+        self.symbol = symbol
+        self.label = label
+        self.value = value
+    }
+
+    /// The checks Ledge runs before showing it.
+    public func validate() throws {
+        guard !symbol.isEmpty, symbol.count <= 100 else { throw SurfaceValidationError.invalid("lock screen row symbol") }
+        guard label.count <= 30 else { throw SurfaceValidationError.tooLarge("lock screen row label over 30 characters") }
+        guard !value.isEmpty, value.count <= 20 else { throw SurfaceValidationError.invalid("lock screen row value") }
+    }
+}
+
+// MARK: Menu bar tile
+
+/// A row in the menu bar panel, under Ledge's own (Shelf, Clipboard, Settings): a symbol, a title and a grey detail
+/// line. Clicking it sends a `SurfaceEvent` with `surface` `"menu-bar-tile"`, `control` the tile's id and `.pressed`.
+/// Up to two per add-on. Declare `"menu-bar-tile"` in the manifest's surfaces.
+public struct MenuBarTile: Codable, Sendable, Equatable {
+    public var id: String
+    public var symbol: String
+    /// Up to 40 characters.
+    public var title: String
+    /// Up to 60 characters.
+    public var detail: String?
+
+    public init(_ id: String, symbol: String, title: String, detail: String? = nil) {
+        self.id = id
+        self.symbol = symbol
+        self.title = title
+        self.detail = detail
+    }
+
+    /// The checks Ledge runs before showing an add-on's tiles.
+    public static func validate(_ tiles: [MenuBarTile]) throws {
+        guard tiles.count <= Surface.maximumMenuBarTiles else { throw SurfaceValidationError.tooLarge("\(tiles.count) menu bar tiles") }
+        var ids = Set<String>()
+        for tile in tiles {
+            guard !tile.id.isEmpty, tile.id.count <= 64, ids.insert(tile.id).inserted else { throw SurfaceValidationError.duplicateID(tile.id) }
+            guard !tile.symbol.isEmpty, tile.symbol.count <= 100 else { throw SurfaceValidationError.invalid("symbol of \(tile.id)") }
+            guard !tile.title.isEmpty, tile.title.count <= 40 else { throw SurfaceValidationError.invalid("title of \(tile.id)") }
+            guard (tile.detail?.count ?? 0) <= 60 else { throw SurfaceValidationError.invalid("detail of \(tile.id)") }
+        }
     }
 }
 

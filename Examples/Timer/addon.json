@@ -1,10 +1,10 @@
 {
   "id": "timer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "protocolVersion": 2,
   "name": "Timer",
   "summary": "A countdown beside your notch",
-  "description": "Start a countdown on the add-on's page and watch it beside the notch. When it ends, the notch says so.",
+  "description": "Start a countdown from the menu bar or the add-on's page, and watch it beside the notch and on the lock screen. When it ends, the notch says so.",
   "author": "Ledge examples",
   "capabilities": [
     "hud"
@@ -12,10 +12,12 @@
   "executable": "Timer",
   "surfaces": [
     "settings-page",
-    "activity"
+    "activity",
+    "lock-screen-row",
+    "menu-bar-tile"
   ],
   "kit": {
-    "minAPI": "0.10.0"
+    "minAPI": "0.11.0"
   },
   "category": "Productivity",
   "creator": {

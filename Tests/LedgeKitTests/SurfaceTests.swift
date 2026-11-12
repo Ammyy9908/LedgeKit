@@ -125,3 +125,17 @@ private actor Seen {
         try LiveActivity.validate((0..<3).map { LiveActivity("a\($0)", symbol: "x", text: "y") })
     }
 }
+
+@Test func lockScreenRowsAndMenuBarTilesValidate() throws {
+    let row = LockScreenRow(symbol: "timer", label: "Timer", value: "4:59")
+    try row.validate()
+    #expect(try JSONDecoder().decode(LockScreenRow.self, from: JSONEncoder().encode(row)) == row)
+    #expect(throws: (any Error).self) { try LockScreenRow(symbol: "timer", label: "Timer", value: "").validate() }
+    #expect(throws: (any Error).self) { try LockScreenRow(symbol: "timer", label: String(repeating: "x", count: 31), value: "1").validate() }
+    let tile = MenuBarTile("start", symbol: "timer", title: "Start a timer", detail: "1 minute")
+    try MenuBarTile.validate([tile])
+    #expect(try JSONDecoder().decode([MenuBarTile].self, from: JSONEncoder().encode([tile])) == [tile])
+    #expect(throws: SurfaceValidationError.duplicateID("start")) { try MenuBarTile.validate([tile, tile]) }
+    #expect(throws: (any Error).self) { try MenuBarTile.validate((0..<3).map { MenuBarTile("t\($0)", symbol: "x", title: "T") }) }
+    #expect(throws: (any Error).self) { try MenuBarTile.validate([MenuBarTile("t", symbol: "x", title: String(repeating: "x", count: 41))]) }
+}

@@ -1,9 +1,10 @@
 import Foundation
 import LedgeKit
 
-// A countdown beside the notch: the example for live activities (LedgeKit 0.10.0).
+// A countdown in every place an add-on can show something (LedgeKit 0.11.0).
 //
-// Its page picks a length and starts or stops it. While it runs, one activity counts down with a progress ring;
+// Its page picks a length and starts or stops it, and so does its row in the menu bar panel. While it runs, one
+// activity counts down beside the notch with a progress ring, and a pill shows the time left on the lock screen;
 // when it ends, a "done" activity shows for five seconds. Ledge's own activities come first, so the timer listens
 // to where it's placed: while the user has turned its activities off it stops sending them, and if it ends where
 // nobody can see it, it also says so with a notch message.
@@ -34,6 +35,26 @@ private actor Countdown {
         ticker = nil
         endsAt = nil
         AddOnSession.show(activities: [])
+        AddOnSession.show(lockScreenRow: nil)
+        showTile()
+    }
+
+    /// The row in the menu bar panel: start a timer of the chosen length, or how long is left and a way to stop it.
+    func showTile() {
+        guard let endsAt else {
+            let title = lengths.first { $0.id == length }?.title ?? "1 minute"
+            AddOnSession.show(menuBarTiles: [MenuBarTile("toggle", symbol: "timer", title: "Start a timer", detail: title)])
+            return
+        }
+        AddOnSession.show(menuBarTiles: [MenuBarTile("toggle", symbol: "stop.circle", title: "Timer · \(Self.clock(endsAt.timeIntervalSinceNow)) left",
+                                                     detail: "Click to stop")])
+    }
+
+    var isRunning: Bool { endsAt != nil }
+
+    static func clock(_ seconds: Double) -> String {
+        let whole = Int(max(0, seconds).rounded(.up))
+        return String(format: "%d:%02d", whole / 60, whole % 60)
     }
 
     func placed(_ placement: ActivityPlacement) {
@@ -54,11 +75,15 @@ private actor Countdown {
         }
     }
 
-    /// The countdown, unless the user turned its activities off; then there's no point sending them.
+    /// The countdown everywhere it shows. The activity is left out while the user has turned activities off; the
+    /// lock screen pill and the menu bar row only show when someone looks, so they're kept current.
     private func send() {
-        guard let endsAt, placement != .suppressed else { return }
+        guard let endsAt else { return }
         let left = max(0, endsAt.timeIntervalSinceNow)
-        let text = String(format: "%d:%02d", Int(left.rounded(.up)) / 60, Int(left.rounded(.up)) % 60)
+        let text = Self.clock(left)
+        AddOnSession.show(lockScreenRow: LockScreenRow(symbol: "timer", label: "Timer", value: text))
+        showTile()
+        guard placement != .suppressed else { return }
         AddOnSession.show(activities: [
             LiveActivity("countdown", symbol: "timer", text: text, progress: .fraction(min(1, max(0, 1 - left / seconds))), importance: .high)
         ])
@@ -68,6 +93,8 @@ private actor Countdown {
         let seen = placement == .center || placement == .side
         endsAt = nil
         ticker = nil
+        AddOnSession.show(lockScreenRow: nil)
+        showTile()
         AddOnSession.show(activities: [LiveActivity("done", symbol: "checkmark.circle.fill", text: "Timer done", importance: .high, lasts: 5)])
         // Waiting behind Ledge's own activities, or turned off: the end would go unseen, so say it in the notch too.
         if !seen { Task { try? await LedgeHost.notify(title: "Timer done", symbol: "timer") } }
@@ -100,15 +127,19 @@ var handlers = AddOnHandlers()
 handlers.activate = {
     if let saved = try? await LedgeHost.value(String.self, forKey: "length") { await countdown.setLength(saved) }
     await showPage()
+    await countdown.showTile()
 }
 handlers.deactivate = { await countdown.stop() }
 handlers.onEvent = { event in
-    switch (event.control, event.action) {
-    case ("length", .picked(let id)):
+    switch (event.surface, event.control, event.action) {
+    case (Surface.menuBarTile, "toggle", .pressed):
+        if await countdown.isRunning { await countdown.stop() } else { await countdown.start() }
+    case (_, "length", .picked(let id)):
         await countdown.setLength(id)
         try? await LedgeHost.set(id, forKey: "length")
-    case ("start", .pressed): await countdown.start()
-    case ("stop", .pressed): await countdown.stop()
+        await countdown.showTile()
+    case (_, "start", .pressed): await countdown.start()
+    case (_, "stop", .pressed): await countdown.stop()
     default: break
     }
     await showPage()
