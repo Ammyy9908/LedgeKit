@@ -10,12 +10,13 @@ out="${1:-.build/docs}"
 base="${2:-LedgeKit}"
 version="$(grep -o 'apiLevel = "[0-9.]*"' Sources/LedgeKit/SessionProtocol.swift | grep -o '[0-9.]*')"
 
-swift package dump-symbol-graph >/dev/null
 graphs="$(mktemp -d)"
 trap 'rm -rf "$graphs"' EXIT
-# Only the library add-ons are written with: not the CLI, the host or the test fixture.
-cp "$(swift build --show-bin-path)/../symbolgraph/LedgeKit.symbols.json" "$graphs/" 2>/dev/null \
-  || cp .build/*/symbolgraph/LedgeKit.symbols.json "$graphs/"
+# Only the library add-ons are written with: the compiler writes its symbol graph as it builds the one target, so
+# the CLI, the host, the test fixture and the tests never come into it. (swift package dump-symbol-graph extracts
+# every module, and fails on the tests with some toolchains.)
+swift build --target LedgeKit -Xswiftc -emit-symbol-graph -Xswiftc -emit-symbol-graph-dir -Xswiftc "$graphs" >/dev/null
+[[ -f "$graphs/LedgeKit.symbols.json" ]] || { echo "No symbol graph for LedgeKit." >&2; exit 1; }
 
 rm -rf "$out"
 xcrun docc convert \
