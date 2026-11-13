@@ -68,7 +68,8 @@ private struct MCPServer {
             ["name": "ledgekit_test", "description": "swift test: Core's tests, including every surface against Ledge's limits.", "inputSchema": schema()],
             ["name": "ledgekit_build", "description": "Build the .ledgeaddon Ledge loads.", "inputSchema": schema()],
             ["name": "ledgekit_check", "description": "Run the add-on with no Ledge, the way Ledge would, and return the JSON report: surfaces sent and refused, calls to Ledge allowed or refused, problems and warnings. Not done while problems isn't empty.",
-             "inputSchema": schema(["script": ["type": "array", "description": "Steps: {\"wait\":1}, {\"visible\":[\"notch-page\"]}, {\"press\":\"id\",\"on\":\"notch-page\",\"screen\":\"list\",\"item\":\"row\"}, {\"edit\":\"body\",\"text\":\"…\"}, {\"end\":\"body\",\"text\":\"…\"}, {\"toggle\":\"id\",\"on\":\"settings-page\",\"to\":true}, {\"pick\":\"id\",\"value\":\"x\"}, {\"change\":\"id\",\"value\":0.5}", "items": ["type": "object"]]])],
+             "inputSchema": schema(["script": ["type": "array", "description": "Steps: {\"wait\":1}, {\"visible\":[\"notch-page\"]}, {\"press\":\"id\",\"on\":\"notch-page\",\"screen\":\"list\",\"item\":\"row\"}, {\"edit\":\"body\",\"text\":\"…\"}, {\"end\":\"body\",\"text\":\"…\"}, {\"toggle\":\"id\",\"on\":\"settings-page\",\"to\":true}, {\"pick\":\"id\",\"value\":\"x\"}, {\"change\":\"id\",\"value\":0.5}", "items": ["type": "object"]],
+                                    "deny": ["type": "array", "items": ["type": "string"], "description": "Capabilities to turn off, as a person can in Ledge, such as [\"hud\"], or [\"all\"]. Refused calls are expected then; check the add-on keeps running and shows what it can't do"]])],
             ["name": "ledgekit_run", "description": "Install the build in the user's Ledge and say whether it started. Needs Developer Mode on in Ledge.", "inputSchema": schema()],
             ["name": "ledgekit_shots", "description": "Install the build in the user's Ledge, have Ledge draw each surface, and return the pictures. Look at them, the narrowest first: the notch page and widgets at Compact and Regular width beside a camera, and every live activity shape. Needs Developer Mode on in Ledge.",
              "inputSchema": schema(["all": ["type": "boolean", "description": "Also return the Large width and the pill display, which are drawn but left out by default"]])],
@@ -124,6 +125,7 @@ private struct MCPServer {
                 try JSONSerialization.data(withJSONObject: script).write(to: file)
                 args += ["--script", file.path]
             }
+            if let deny = input["deny"] as? [String], !deny.isEmpty { args += ["--deny", deny.joined(separator: ",")] }
             let outcome = run(tool, args)
             let json = (try? String(contentsOf: report, encoding: .utf8)) ?? "No report: the check didn't get that far.\n\n\(outcome.text)"
             return ["content": [["type": "text", "text": json]], "isError": outcome.status != 0]

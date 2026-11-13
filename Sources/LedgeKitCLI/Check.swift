@@ -14,6 +14,7 @@ func check(_ given: [String]) async throws -> Bool {
     let scriptPath = option("--script", in: &arguments)
     let reportPath = option("--report", in: &arguments)
     let skipBuild = flag("--no-build", in: &arguments)
+    let deny = option("--deny", in: &arguments)
     let path = arguments.first.map { URL(fileURLWithPath: $0).standardizedFileURL } ?? packageFolder([])
 
     // The package to run: a .ledgeaddon as given, or the folder's, built first.
@@ -30,7 +31,8 @@ func check(_ given: [String]) async throws -> Bool {
     let steps = try scriptPath.map(readScript) ?? defaultSteps(for: package.manifest)
 
     let report = CheckReport(manifest: package.manifest)
-    let host = SimulatedHost(manifest: package.manifest, report: report)
+    let denied = try deniedCapabilities(deny, manifest: package.manifest, report: report)
+    let host = SimulatedHost(manifest: package.manifest, report: report, denied: denied)
     defer { host.cleanUp() }
     let runtime = AddOnRuntime(addOnID: package.manifest.id, executable: package.executableURL,
                                onEvent: { event in report.received(event) },
@@ -117,6 +119,19 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
 // MARK: Ledge, simulated
 
 /// Answers an add-on's calls to Ledge (`LedgeHost`) the way Ledge does, and notes each one.
+/// The capabilities `--deny` turns off: a comma-separated list, or "all" for every one the add-on asks for. As a person
+/// would by switching them off in Ledge, so the check shows what the add-on does without them.
+private func deniedCapabilities(_ given: String?, manifest: AddOnManifest, report: CheckReport) throws -> Set<String> {
+    guard let given else { return [] }
+    let asked = Set(manifest.capabilities)
+    let names = given == "all" ? asked : Set(given.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+    for name in names.sorted() where !asked.contains(name) {
+        throw CLIError("--deny \(name): addon.json doesn't ask for it, so it's off already. It asks for: \(asked.isEmpty ? "nothing" : asked.sorted().joined(separator: ", ")).")
+    }
+    report.deny(names)
+    return names
+}
+
 private final class SimulatedHost: @unchecked Sendable {
     private let manifest: AddOnManifest
     private let report: CheckReport
@@ -126,11 +141,14 @@ private final class SimulatedHost: @unchecked Sendable {
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("ledgekit-check-\(UUID().uuidString)")
     /// What Ledge would grant: the capabilities it knows, of those the manifest asks for.
     private let granted: Set<String>
+    /// What the person turned off (`--deny`): refused as Ledge refuses them, but expected, so not a problem.
+    private let denied: Set<String>
 
-    init(manifest: AddOnManifest, report: CheckReport) {
+    init(manifest: AddOnManifest, report: CheckReport, denied: Set<String> = []) {
         self.manifest = manifest
         self.report = report
-        granted = Set(manifest.capabilities).intersection(AddOnCapability.known)
+        self.denied = denied
+        granted = Set(manifest.capabilities).intersection(AddOnCapability.known).subtracting(denied)
         for capability in manifest.capabilities where !AddOnCapability.known.contains(capability) {
             report.warning("\(capability) isn't a capability this LedgeKit knows, so Ledge won't grant it.")
         }
@@ -143,6 +161,10 @@ private final class SimulatedHost: @unchecked Sendable {
         let object: [String: JSONValue] = { if case .object(let value) = params { return value }; return [:] }()
         func string(_ key: String) -> String? { if case .string(let value)? = object[key] { return value }; return nil }
         func require(_ capability: String) throws {
+            if denied.contains(capability) {
+                report.call(method, denied: capability)
+                throw CLIError("\(manifest.name) isn't allowed \(capability).")
+            }
             guard granted.contains(capability) else {
                 report.call(method, refused: "needs the \(capability) capability in addon.json")
                 throw CLIError("\(manifest.name) isn't allowed \(capability).")
@@ -253,6 +275,19 @@ private final class CheckReport: @unchecked Sendable {
     func warning(_ text: String) { lock.withLock { if !warnings.contains(text) { warnings.append(text) } } }
     func note(_ text: String) { lock.withLock { timeline.append(text) } }
 
+    /// Capabilities the check turned off, as a person can in Ledge.
+    private var denied: [String] = []
+
+    func deny(_ names: Set<String>) { lock.withLock { denied = names.sorted() } }
+
+    /// A call refused because its capability was turned off: what Ledge does, and what the add-on has to handle.
+    func call(_ method: String, denied capability: String) {
+        lock.withLock {
+            calls.append(["method": method, "result": "denied", "reason": "\(capability) is turned off"])
+            timeline.append("call \(method): refused, \(capability) is turned off")
+        }
+    }
+
     func call(_ method: String, refused reason: String? = nil, detail: String? = nil) {
         lock.withLock {
             var entry = ["method": method, "result": reason == nil ? "allowed" : "refused"]
@@ -358,6 +393,10 @@ private final class CheckReport: @unchecked Sendable {
                 let allowed = calls.filter { $0["result"] == "allowed" }.count
                 print("• calls to Ledge: \(calls.count), \(allowed) allowed")
             }
+            if !denied.isEmpty {
+                let refused = calls.filter { $0["result"] == "denied" }.count
+                print("⊘ turned off: \(denied.joined(separator: ", ")). Ledge refused \(refused) call\(refused == 1 ? "" : "s"); look at what the add-on showed instead.")
+            }
             for line in problems { print("✗ \(line)") }
             for line in warnings { print("! \(line)") }
             print(passed ? "✓ Ledge would run it as it is." : "\(problems.count) problem\(problems.count == 1 ? "" : "s").")
@@ -378,6 +417,7 @@ private final class CheckReport: @unchecked Sendable {
                     ["surface": $0, "declared": true, "sent": 0, "accepted": 0, "refusals": [String]()] as [String: Any]
                 },
                 "calls": calls,
+                "denied": denied,
                 "problems": problems,
                 "warnings": warnings,
                 "timeline": timeline,
