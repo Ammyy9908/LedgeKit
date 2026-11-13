@@ -29,6 +29,10 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
       and live activities beside the notch, as the pill and below the notch (name@shape.png). Look at the narrowest.
   ledgekit submit [<folder>] [--print] [--repo <LedgeAddOns checkout>]
       Checks it the way review will, then opens a pull request adding it to LedgeAddOns. --print only shows what.
+  ledgekit update [<folder>] [--raise]
+      Moves the add-on to this ledgekit's LedgeKit (\(SessionProtocol.release)): Package.swift's pin and Package.resolved.
+      kit.minAPI stays, so it keeps running in older Ledge; --raise moves it to \(SessionProtocol.apiLevel) too, for when
+      the add-on uses something new.
   ledgekit agent [<folder>] [--force]
       Writes AGENTS.md, CLAUDE.md, Cursor rules and the MCP wiring, so a coding agent knows the rules and the loop.
   ledgekit mcp [--package <folder>]
@@ -54,6 +58,7 @@ do {
     case "run": try runInLedge(arguments)
     case "shots": try shots(arguments)
     case "agent": try agent(arguments)
+    case "update": try update(arguments)
     case "submit": try await submit(arguments)
     case "mcp": mcp(arguments)
     case "version", "--version": print(SessionProtocol.release)

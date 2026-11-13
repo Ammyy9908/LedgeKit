@@ -9,7 +9,6 @@ import LedgeKit
 private let allowedTop: Set<String> = ["addon.json", "listing.json", "Package.swift", "Package.resolved", "README.md",
                                        "CHANGELOG.md", "LICENSE", "NOTICE.md", ".gitignore", "Sources", "Tests", "Assets", "Store"]
 private let required = ["addon.json", "Package.swift", "README.md", "CHANGELOG.md", "Assets/Icon.png"]
-private let kitURL = "https://github.com/Ammyy9908/LedgeKit.git"
 
 /// Returns whether it passed.
 func validate(_ given: [String]) throws -> Bool {
