@@ -19,7 +19,7 @@ public enum SessionProtocol {
     public static let apiLevel = "0.15.0"
     /// This LedgeKit's release, which add-ons pin in Package.swift. A patch release changes only this: add-ons'
     /// API, and so `kit.minAPI`, stay at ``apiLevel``, so an add-on built with it runs in every Ledge that has it.
-    public static let release = "0.15.0"
+    public static let release = "0.15.1"
     /// The longest message in either direction, newline excluded.
     public static let maximumMessageBytes = 1_048_576
 
