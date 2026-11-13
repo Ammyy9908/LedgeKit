@@ -130,6 +130,13 @@ public enum AddOnSession {
         update(topic: Surface.activitiesTopic, payload: payload)
     }
 
+    /// Shows the add-on's page in the open notch, or takes it down with nil. Each send replaces the screen; see
+    /// `PageScreen` for moving between screens. Declare `notch-page` in the manifest. Needs LedgeKit 0.12.0.
+    public static func show(notchPage: NotchPage?) {
+        guard let payload = try? JSONValue(encoding: notchPage) else { return }
+        update(topic: Surface.notchPageTopic, payload: payload)
+    }
+
     /// Shows the add-on's player menu and Playing Next, or removes them with nil. Declare `player` in the manifest.
     public static func show(player: PlayerExtension?) {
         guard let payload = try? JSONValue(encoding: player) else { return }

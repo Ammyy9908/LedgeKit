@@ -20,6 +20,8 @@ public enum Surface {
     public static let lockScreenRow = "lock-screen-row"
     /// A row in the menu bar panel.
     public static let menuBarTile = "menu-bar-tile"
+    /// The add-on's own page in the open notch, with an icon in the pill under it. Needs LedgeKit 0.12.0.
+    public static let notchPage = "notch-page"
 
     /// Update topics an add-on sends surfaces on.
     public static let settingsTopic = "surface.settings-page"
@@ -29,6 +31,7 @@ public enum Surface {
     public static let activitiesTopic = "surface.activities"
     public static let lockScreenRowTopic = "surface.lock-screen-row"
     public static let menuBarTilesTopic = "surface.menu-bar-tiles"
+    public static let notchPageTopic = "surface.notch-page"
     public static let maximumMenuBarTiles = 2
     /// The request Ledge sends when the user acts on a control.
     public static let eventMethod = "ledge.surfaceEvent"
@@ -51,6 +54,12 @@ public enum Surface {
     public static let maximumDepth = 6
     public static let maximumText = 1000
     public static let maximumPlayerActions = 4
+
+    /// Limits for a notch page's screen. A screen may hold more parts than a widget, since it has the page to itself.
+    public static let maximumPageNodes = 200
+    public static let maximumListRows = 100
+    public static let maximumPageActions = 3
+    public static let maximumEditorText = 50_000
 }
 
 // MARK: Settings page
@@ -448,23 +457,151 @@ public indirect enum WidgetNode: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: Notch page
+
+/// The add-on's own page in the open notch. It gets an icon in the pill under the notch, after Ledge's Shelf,
+/// Clipboard and Widgets, and shows one `PageScreen` at a time. Declare `"notch-page"` in the manifest and send it
+/// with `AddOnSession.show(notchPage:)`; sending nil takes the page down. Needs LedgeKit 0.12.0.
+public struct NotchPage: Codable, Sendable, Equatable {
+    /// The page's name, read out for the pill's icon and shown as its tooltip.
+    public var title: String
+    /// An SF Symbol for the page's icon in the pill.
+    public var symbol: String
+    /// How tall the open notch is on this page. Ledge sets the exact height, the same for every add-on.
+    public var size: Size
+    /// What the page shows now. Send a new screen to move to it.
+    public var screen: PageScreen
+
+    public init(title: String, symbol: String, size: Size = .medium, screen: PageScreen) {
+        self.title = title
+        self.symbol = symbol
+        self.size = size
+        self.screen = screen
+    }
+
+    public enum Size: String, Codable, Sendable {
+        case small, medium, large
+    }
+}
+
+/// One screen of a notch page: a header and what's under it. Moving between screens is the add-on's to decide:
+/// it sends the next screen, and Ledge slides forward when the new one's `depth` is greater, back when it's less,
+/// and swaps in place when it's the same. A screen sent again with the same `id` updates in place.
+public struct PageScreen: Codable, Sendable, Equatable {
+    /// The `control` of the header's back button.
+    public static let backControl = "back"
+
+    /// Stable for as long as the screen shows the same thing, such as `"list"` or `"note-42"`.
+    public var id: String
+    /// 0 for the page's first screen, 1 for one opened from it, and so on.
+    public var depth: Int
+    /// A title at the top left, like "Notes". Leave it out on a screen whose caption says enough.
+    public var title: String?
+    /// A small grey line in the middle of the header, like "Edited 11:35 PM".
+    public var caption: String?
+    /// Shows a back button at the left of the header. Pressing it sends `pressed` with `PageScreen.backControl`.
+    public var back: Bool
+    /// Up to three round buttons at the right of the header, such as New, Copy and Delete.
+    public var actions: [PageAction]
+    public var content: PageNode
+
+    public init(_ id: String, depth: Int = 0, title: String? = nil, caption: String? = nil, back: Bool = false,
+                actions: [PageAction] = [], content: PageNode) {
+        self.id = id
+        self.depth = depth
+        self.title = title
+        self.caption = caption
+        self.back = back
+        self.actions = actions
+        self.content = content
+    }
+}
+
+/// A round button in a notch page's header. Pressing it sends `pressed` with its id.
+public struct PageAction: Codable, Sendable, Equatable {
+    public var id: String
+    /// An SF Symbol.
+    public var symbol: String
+    /// What the button does, for VoiceOver and its tooltip.
+    public var label: String
+    /// Draws the button in red, for something like Delete.
+    public var destructive: Bool
+
+    public init(_ id: String, symbol: String, label: String, destructive: Bool = false) {
+        self.id = id
+        self.symbol = symbol
+        self.label = label
+        self.destructive = destructive
+    }
+}
+
+/// What a notch page's screen is made of: a widget's parts, plus a list, an empty state and a text editor.
+public indirect enum PageNode: Codable, Sendable, Equatable {
+    case vstack(spacing: Double?, children: [PageNode])
+    case hstack(spacing: Double?, children: [PageNode])
+    case text(String, style: WidgetNode.TextStyle?)
+    case symbol(String, size: Double?)
+    /// 0 to 1.
+    case progress(Double, label: String?)
+    /// Sends a `pressed` event with this id.
+    case button(id: String, title: String, symbol: String?)
+    case spacer
+    /// Rows that each open something. Pressing one sends `pressed` with the list's id as `control` and the row's
+    /// id as `item`. Ledge scrolls the list when it's taller than the page.
+    case list(id: String, rows: [ListRow])
+    /// What a screen shows when there's nothing in it yet: a symbol, a title and an optional line under it.
+    case empty(symbol: String, title: String, detail: String?)
+    /// A text editor that fills the space it's given, with a formatting bar. The text is Markdown: Ledge styles it
+    /// as it's typed and hands it back as Markdown. While someone is typing, Ledge keeps their text even if the
+    /// add-on sends the screen again, so keep the editor's `id` the same. Sends `edited` as they type and `ended`
+    /// when the editor loses the keyboard. At most one editor per screen.
+    case editor(id: String, text: String, placeholder: String?, autofocus: Bool)
+}
+
+/// A row in a notch page's list.
+public struct ListRow: Codable, Sendable, Equatable {
+    public var id: String
+    public var title: String
+    /// A grey line under the title, such as the start of a note.
+    public var subtitle: String?
+    /// A short grey label before the subtitle, such as "12:41 PM".
+    public var detail: String?
+    /// An optional SF Symbol at the start of the row.
+    public var symbol: String?
+
+    public init(_ id: String, title: String, subtitle: String? = nil, detail: String? = nil, symbol: String? = nil) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.detail = detail
+        self.symbol = symbol
+    }
+}
+
 // MARK: Events
 
 /// What the user did, sent to `AddOnHandlers.onEvent`.
 public struct SurfaceEvent: Codable, Sendable, Equatable {
-    /// `Surface.settingsPage` or `Surface.widget`.
+    /// `Surface.settingsPage`, `Surface.widget` or `Surface.notchPage`.
     public var surface: String
     /// The widget's id, for widget events.
     public var widget: String?
-    /// The row or button id.
+    /// The row, button, list or editor id. On a notch page, the header's back button is `PageScreen.backControl`.
     public var control: String
     public var action: Action
+    /// For notch page events: the id of the screen the event came from. An event from a screen the add-on has
+    /// already moved on from can be ignored.
+    public var screen: String?
+    /// For a list on a notch page: the id of the row that was pressed. `control` is then the list's id.
+    public var item: String?
 
-    public init(surface: String, widget: String? = nil, control: String, action: Action) {
+    public init(surface: String, widget: String? = nil, control: String, action: Action, screen: String? = nil, item: String? = nil) {
         self.surface = surface
         self.widget = widget
         self.control = control
         self.action = action
+        self.screen = screen
+        self.item = item
     }
 
     public enum Action: Codable, Sendable, Equatable {
@@ -473,6 +610,8 @@ public struct SurfaceEvent: Codable, Sendable, Equatable {
         case changed(Double)
         case edited(String)
         case pressed
+        /// An editor on a notch page lost the keyboard, with its final text: the moment to save. Needs 0.12.0.
+        case ended(String)
     }
 }
 
@@ -553,6 +692,76 @@ extension Widget {
             case let .button(id, title, _):
                 guard ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 try checkText(title)
+            case .symbol, .spacer:
+                break
+            }
+        }
+        try walk(content, depth: 1)
+    }
+}
+
+extension NotchPage {
+    /// The checks Ledge runs before drawing the page.
+    public func validate() throws {
+        guard !title.isEmpty, title.count <= 40 else { throw SurfaceValidationError.invalid("notch page title") }
+        guard !symbol.isEmpty, symbol.count <= 100 else { throw SurfaceValidationError.invalid("notch page symbol") }
+        try screen.validate()
+    }
+}
+
+extension PageScreen {
+    /// The checks Ledge runs before drawing the screen.
+    public func validate() throws {
+        guard !id.isEmpty, id.count <= 128 else { throw SurfaceValidationError.invalid("screen id") }
+        guard (0...16).contains(depth) else { throw SurfaceValidationError.invalid("screen depth \(depth)") }
+        guard (title?.count ?? 0) <= 60, (caption?.count ?? 0) <= 60 else { throw SurfaceValidationError.tooLarge("screen title or caption over 60 characters") }
+        guard actions.count <= Surface.maximumPageActions else { throw SurfaceValidationError.tooLarge("\(actions.count) header buttons") }
+        // Ids are unique across the whole screen: the header's buttons, the back button, lists, rows' parents and
+        // controls all name themselves in the same events.
+        var ids: Set<String> = back ? [Self.backControl] : []
+        for action in actions {
+            guard !action.id.isEmpty, ids.insert(action.id).inserted else { throw SurfaceValidationError.duplicateID(action.id) }
+            guard !action.symbol.isEmpty, action.symbol.count <= 100 else { throw SurfaceValidationError.invalid("symbol of \(action.id)") }
+            guard !action.label.isEmpty, action.label.count <= 60 else { throw SurfaceValidationError.invalid("label of \(action.id)") }
+        }
+        var count = 0
+        var editors = 0
+        func walk(_ node: PageNode, depth: Int) throws {
+            count += 1
+            guard depth <= Surface.maximumDepth else { throw SurfaceValidationError.tooLarge("nesting deeper than \(Surface.maximumDepth)") }
+            guard count <= Surface.maximumPageNodes else { throw SurfaceValidationError.tooLarge("more than \(Surface.maximumPageNodes) parts") }
+            switch node {
+            case let .vstack(_, children), let .hstack(_, children):
+                for child in children { try walk(child, depth: depth + 1) }
+            case let .text(text, _):
+                try checkText(text)
+            case let .progress(value, label):
+                guard (0...1).contains(value) else { throw SurfaceValidationError.invalid("progress \(value)") }
+                try checkText(label)
+            case let .button(id, title, _):
+                guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                try checkText(title)
+            case let .list(id, rows):
+                guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                guard rows.count <= Surface.maximumListRows else { throw SurfaceValidationError.tooLarge("\(rows.count) rows in list \(id)") }
+                var rowIDs = Set<String>()
+                for row in rows {
+                    guard !row.id.isEmpty, rowIDs.insert(row.id).inserted else { throw SurfaceValidationError.duplicateID(row.id) }
+                    guard !row.title.isEmpty else { throw SurfaceValidationError.invalid("title of row \(row.id)") }
+                    try checkText(row.title)
+                    try checkText(row.subtitle)
+                    guard (row.detail?.count ?? 0) <= 30 else { throw SurfaceValidationError.tooLarge("detail of row \(row.id) over 30 characters") }
+                }
+            case let .empty(symbol, title, detail):
+                guard !symbol.isEmpty, !title.isEmpty else { throw SurfaceValidationError.invalid("empty state") }
+                try checkText(title)
+                try checkText(detail)
+            case let .editor(id, text, placeholder, _):
+                guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                editors += 1
+                guard editors <= 1 else { throw SurfaceValidationError.invalid("more than one editor on a screen") }
+                guard text.count <= Surface.maximumEditorText else { throw SurfaceValidationError.tooLarge("editor text over \(Surface.maximumEditorText) characters") }
+                try checkText(placeholder)
             case .symbol, .spacer:
                 break
             }
