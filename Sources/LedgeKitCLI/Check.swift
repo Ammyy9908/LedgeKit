@@ -366,7 +366,7 @@ private final class CheckReport: @unchecked Sendable {
         try lock.withLock {
             let object: [String: Any] = [
                 "addOn": ["id": manifest.id, "version": manifest.version, "minAPI": manifest.kit?.minAPI ?? NSNull()],
-                "checkedWith": SessionProtocol.apiLevel,
+                "checkedWith": SessionProtocol.release,
                 "passed": passed,
                 "started": started,
                 "surfaces": sent.sorted { $0.key < $1.key }.map { name, counts in

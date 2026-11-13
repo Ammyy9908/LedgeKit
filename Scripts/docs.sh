@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out="${1:-.build/docs}"
 base="${2:-LedgeKit}"
-version="$(grep -o 'apiLevel = "[0-9.]*"' Sources/LedgeKit/SessionProtocol.swift | grep -o '[0-9.]*')"
+version="$(grep -o 'release = "[0-9.]*"' Sources/LedgeKit/SessionProtocol.swift | grep -o '[0-9.]*')"
 
 graphs="$(mktemp -d)"
 trap 'rm -rf "$graphs"' EXIT
