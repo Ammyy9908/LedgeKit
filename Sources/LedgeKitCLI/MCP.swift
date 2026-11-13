@@ -75,6 +75,7 @@ private struct MCPServer {
              "inputSchema": schema(["all": ["type": "boolean", "description": "Also return the Large width and the pill display, which are drawn but left out by default"]])],
             ["name": "ledgekit_validate", "description": "Check the folder the way LedgeAddOns does. submit: true makes the to-dos errors, as before a pull request.",
              "inputSchema": schema(["submit": ["type": "boolean"]])],
+            ["name": "ledgekit_lint", "description": "What review would send back, read from the sources with no build, as JSON: each finding's rule, severity, file, line and what to do instead. Fix them; don't add ledgekit:allow waivers yourself.", "inputSchema": schema()],
             ["name": "ledgekit_update", "description": "Move the add-on to this ledgekit's LedgeKit: Package.swift's pin and Package.resolved. kit.minAPI stays unless raise is true, which moves it to the new API level; raise only when the add-on uses something new (ledgekit_check says so).",
              "inputSchema": schema(["raise": ["type": "boolean"]])],
             ["name": "ledgekit_docs", "description": "The rules and the loop for building a Ledge add-on, and where the full docs are.", "inputSchema": schema()],
@@ -151,6 +152,9 @@ private struct MCPServer {
                 content.append(["type": "image", "data": data.base64EncodedString(), "mimeType": "image/png"])
             }
             return ["content": content, "isError": outcome.status != 0]
+        case "ledgekit_lint":
+            let outcome = run(tool, ["lint", "--json"])
+            return ["content": [["type": "text", "text": outcome.text]], "isError": outcome.status != 0]
         case "ledgekit_update":
             return result(run(tool, ["update"] + (input["raise"] as? Bool == true ? ["--raise"] : [])))
         case "ledgekit_docs":

@@ -20,6 +20,7 @@ func submit(_ given: [String]) async throws {
     // 1. What review checks first.
     print("Checking \(manifest.name) \(manifest.version) the way review will…")
     guard try validate([folder.path, "--submit"]) else { throw CLIError("Fix what validate --submit reports, then submit again.") }
+    guard try lint([folder.path]) else { throw CLIError("ledgekit lint found errors review would send back. Fix them, then submit again.") }
     do { try run("swift", ["test", "--package-path", folder.path]) } catch { throw CLIError("The tests fail. Fix them, then submit again.") }
     let reportFile = FileManager.default.temporaryDirectory.appendingPathComponent("ledgekit-submit-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: reportFile) }
