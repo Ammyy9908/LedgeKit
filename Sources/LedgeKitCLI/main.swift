@@ -26,7 +26,8 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
         {"end": "body", "text": "…"}  {"toggle": "sounds", "to": true}  {"pick": "units", "value": "c"}  {"change": "volume", "value": 0.5}
       With no script it waits, shows every declared surface, waits, then hides them.
       --deny turns capabilities off, as a person can in Ledge: calls that need them are refused, which isn't a
-      problem, but the add-on must keep running and say what it can't do.
+      problem, but the add-on must keep running and say what it can't do. The report keeps the last version of each
+      surface Ledge took, as surfaces[].last: what a person would see.
   ledgekit run [<folder> | <Name.ledgeaddon>] [--no-build]
       Installs it in your Ledge and says whether it started. Needs Ledge's Developer Mode (Add-on Store, ⋯).
   ledgekit shots [<folder> | <Name.ledgeaddon>] [--out shots] [--shape notch,pill] [--width compact,regular,large]

@@ -266,6 +266,8 @@ private final class CheckReport: @unchecked Sendable {
     private var calls: [[String: String]] = []
     /// Per surface: how many sends, how many Ledge took, and why it refused the others.
     private var sent: [String: (sent: Int, accepted: Int, refusals: [String])] = [:]
+    /// The last version of each surface Ledge took, as the add-on sent it: what a person would see when the check ends.
+    private var last: [String: JSONValue] = [:]
     private(set) var hasPage = false
     private(set) var hasAttentionActivity = false
 
@@ -323,6 +325,7 @@ private final class CheckReport: @unchecked Sendable {
             lock.withLock {
                 sent[name, default: (0, 0, [])].sent += 1
                 sent[name, default: (0, 0, [])].accepted += 1
+                last[name] = payload
                 timeline.append("sent \(name)")
                 switch update {
                 case .notchPage(let page)?:
@@ -411,8 +414,13 @@ private final class CheckReport: @unchecked Sendable {
                 "passed": passed,
                 "started": started,
                 "surfaces": sent.sorted { $0.key < $1.key }.map { name, counts in
-                    ["surface": name, "declared": (manifest.surfaces ?? []).contains(name), "sent": counts.sent,
-                     "accepted": counts.accepted, "refusals": counts.refusals] as [String: Any]
+                    var entry: [String: Any] = ["surface": name, "declared": (manifest.surfaces ?? []).contains(name), "sent": counts.sent,
+                                                "accepted": counts.accepted, "refusals": counts.refusals]
+                    if let payload = last[name], let data = try? JSONEncoder().encode(payload),
+                       let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
+                        entry["last"] = object
+                    }
+                    return entry
                 } + Set(manifest.surfaces ?? []).subtracting(sent.keys).sorted().map {
                     ["surface": $0, "declared": true, "sent": 0, "accepted": 0, "refusals": [String]()] as [String: Any]
                 },

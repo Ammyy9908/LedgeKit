@@ -121,7 +121,8 @@ Use the `ledgekit` MCP tools when you have them; otherwise the same commands in 
 3. `ledgekit check --report check/report.json` (`ledgekit_check`). It runs the add-on with no Ledge and says what
    Ledge would refuse. **You're not done while it reports problems.** Read the warnings too. If the add-on asks for
    capabilities, check again with `--deny all` (`deny: ["all"]`): a person can turn any of them off, and the add-on
-   must keep running and say what it can't do.
+   must keep running and say what it can't do. The report's `surfaces[].last` is the last version of each surface
+   Ledge took: read it to see what a person would see.
 4. `ledgekit shots --out shots` (`ledgekit_shots`) when the user's Ledge has Developer Mode on: Ledge draws each
    surface into a PNG, in every shape people meet it in: each notch width, beside a camera and as a pill.
    **Look at them, the narrowest first** (`@notch-compact`); a surface that passes check can still look wrong.
