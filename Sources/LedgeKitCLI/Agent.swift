@@ -125,7 +125,9 @@ Use the `ledgekit` MCP tools when you have them; otherwise the same commands in 
 4. `ledgekit shots --out shots` (`ledgekit_shots`) when the user's Ledge has Developer Mode on: Ledge draws each
    surface into a PNG, in every shape people meet it in: each notch width, beside a camera and as a pill.
    **Look at them, the narrowest first** (`@notch-compact`); a surface that passes check can still look wrong.
-5. `ledgekit validate` (`ledgekit_validate`) before saying it's ready, and `ledgekit validate --submit` before a pull
+5. `ledgekit lint` (`ledgekit_lint`): what review would send back, with file and line. Fix what it finds. Never add a
+   `// ledgekit:allow` waiver yourself; that's the developer's call, with a reason beside it.
+6. `ledgekit validate` (`ledgekit_validate`) before saying it's ready, and `ledgekit validate --submit` before a pull
    request to LedgeAddOns.
 
 A green build isn't the end. Check, then look.

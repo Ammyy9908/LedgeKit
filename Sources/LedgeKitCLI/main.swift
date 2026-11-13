@@ -12,6 +12,10 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
       Builds a .ledgeaddon you can load in Ledge (Settings, Add-on Store, Load Add-on…), ad-hoc signed.
   ledgekit validate [<folder> | <addon.json>] [--submit]
       Checks an add-on folder the way LedgeAddOns does, or just a manifest.
+  ledgekit lint [<folder>] [--json]
+      What review would send back, read from Sources/ with no build: print breaking the session, refusals ignored
+      with try?, programs with no deadline, work while nothing is seen, secrets in settings, logged contents,
+      home-folder paths. Each with file:line and what to do instead. // ledgekit:allow <rule> waives one line.
   ledgekit check [<folder> | <Name.ledgeaddon>] [--script steps.json] [--report report.json] [--deny hud,…|all]
                  [--no-build]
       Runs the add-on with no Ledge, the way Ledge would: every surface it sends checked as Ledge checks it,
@@ -62,6 +66,7 @@ do {
     case "shots": try shots(arguments)
     case "agent": try agent(arguments)
     case "update": try update(arguments)
+    case "lint": exit(try lint(arguments) ? 0 : 1)
     case "submit": try await submit(arguments)
     case "mcp": mcp(arguments)
     case "version", "--version": print(SessionProtocol.release)
