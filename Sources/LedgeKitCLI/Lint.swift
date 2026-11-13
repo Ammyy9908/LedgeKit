@@ -83,7 +83,31 @@ func lintFindings(in folder: URL) -> [LintFinding] {
             }
         }
     }
+    findings += destructiveTools(files, root: folder.resolvingSymlinksInPath().path)
     return findings.sorted { ($0.file, $0.line) < ($1.file, $1.line) }
+}
+
+/// A tool whose name says it deletes, clears or sends, declared without `destructive: true` within its next lines:
+/// Ledge only asks the person first when the tool says so.
+private func destructiveTools(_ files: [(URL, String)], root: String) -> [LintFinding] {
+    let declaration = try! NSRegularExpression(pattern: #"AddOnTool\(\s*"([a-z0-9_]*(delete|remove|trash|clear|erase|empty|send|overwrite|replace)[a-z0-9_]*)""#)
+    var findings: [LintFinding] = []
+    for (url, text) in files {
+        let lines = text.components(separatedBy: "\n")
+        for (index, line) in lines.enumerated() {
+            guard let match = declaration.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+                  let range = Range(match.range(at: 1), in: line) else { continue }
+            let window = lines[index..<min(lines.count, index + 8)].joined(separator: "\n")
+            if window.contains("destructive: true") { continue }
+            let waiver = "ledgekit:allow tool-destructive"
+            if line.contains(waiver) || (index > 0 && lines[index - 1].contains(waiver)) { continue }
+            let path = url.resolvingSymlinksInPath().path
+            let relative = path.hasPrefix(root + "/") ? String(path.dropFirst(root.count + 1)) : url.lastPathComponent
+            findings.append(LintFinding(rule: "tool-destructive", severity: .warning, file: relative, line: index + 1,
+                message: "The tool \(line[range]) sounds like it can't be undone, but isn't marked destructive: true, so Ledge won't ask the person first."))
+        }
+    }
+    return findings
 }
 
 /// Prints the findings, or writes them as JSON. True when nothing is an error.

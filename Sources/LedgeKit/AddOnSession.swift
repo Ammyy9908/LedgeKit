@@ -31,6 +31,9 @@ public struct AddOnHandlers: Sendable {
     /// Ledge asks a player action's state for a song, or the user pressed it. Return the state after it, or nil
     /// when it isn't known. Requests run side by side, like other methods. Throw `AddOnError` to say why it failed.
     public var onPlayerAction: @Sendable (PlayerActionRequest) async throws -> Bool? = { _ in nil }
+    /// An AI app the person allowed runs one of the add-on's tools (LedgeKit 0.16.0). Ledge has already checked the
+    /// arguments against the tool's. Throw `AddOnError` with a sentence the AI app can act on to refuse.
+    public var onTool: @Sendable (ToolCall) async throws -> ToolResult = { call in throw AddOnError("This add-on has no tool named \(call.tool).") }
     /// Ledge opened the player menu from `show(player:)`, or the user picked one of its items.
     public var onPlayerMenu: @Sendable (PlayerMenuRequest) async throws -> [PlayerMenu.Item] = { _ in [] }
     /// Ledge wants Playing Next, or the user picked a song to play next.
@@ -51,6 +54,9 @@ public struct AddOnHandlers: Sendable {
                 guard let state = try await onPlayerAction(try params.decode(PlayerActionRequest.self)) else { return .null }
                 return .bool(state)
             }
+        case Surface.toolMethod:
+            let onTool = self.onTool
+            return { params in try JSONValue(encoding: try await onTool(try params.decode(ToolCall.self))) }
         case Surface.playerMenuMethod:
             let onPlayerMenu = self.onPlayerMenu
             return { params in try JSONValue(encoding: try await onPlayerMenu(try params.decode(PlayerMenuRequest.self))) }
@@ -124,6 +130,13 @@ public enum AddOnSession {
     public static func show(menuBarTiles: [MenuBarTile]) {
         guard let payload = try? JSONValue(encoding: menuBarTiles) else { return }
         update(topic: Surface.menuBarTilesTopic, payload: payload)
+    }
+
+    /// Offers the add-on's tools to AI apps the person allows, replacing the last list; an empty list offers none.
+    /// Needs 0.16.0 and `"ai-tool"` in the manifest's surfaces.
+    public static func show(tools: [AddOnTool]) {
+        guard let payload = try? JSONValue(encoding: tools) else { return }
+        update(topic: Surface.aiToolsTopic, payload: payload)
     }
 
     /// Shows the add-on's live activities beside the notch, replacing the last set; an empty list takes them all down.

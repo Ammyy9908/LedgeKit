@@ -64,10 +64,12 @@ func check(_ given: [String]) async throws -> Bool {
 /// One step of a check. In JSON: {"wait": 1}, {"visible": ["notch-page"]},
 /// {"press": "add", "on": "notch-page", "screen": "list", "item": "n1"}, {"edit": "body", "text": "…", "on": "notch-page"},
 /// {"end": "body", "text": "…"}, {"toggle": "id", "on": "settings-page", "to": true}, {"pick": "id", "value": "x"},
-/// {"change": "id", "value": 0.5}.
+/// {"change": "id", "value": 0.5}, {"tool": "add_note", "arguments": {"text": "…"}}.
 private struct Step: Decodable {
     var wait: Double?
     var visible: [String]?
+    var tool: String?
+    var arguments: JSONValue?
     var press, edit, end, toggle, pick, change: String?
     var on: String?
     var screen, item, widget, text: String?
@@ -100,6 +102,26 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
         try? await runtime.visibilityChanged(SurfaceVisibility(visible: Set(visible)))
         return
     }
+    if let name = step.tool {
+        // As Ledge will: the tool must be one the add-on offered, and the arguments must fit it.
+        guard let tool = report.lastTools().first(where: { $0.name == name }) else {
+            report.problem("The script calls \(name), which isn't among the tools the add-on sent.")
+            return
+        }
+        let given = step.arguments ?? .null
+        do {
+            let arguments = try tool.check(given)
+            let result = try await runtime.runTool(ToolCall(tool: name, arguments: arguments, app: "ledgekit check"))
+            report.tool(name, arguments: given, result: result)
+        } catch let error as AddOnError {
+            report.tool(name, arguments: given, refused: error.message)
+        } catch AddOnRuntimeError.addOnError(let message) {
+            report.tool(name, arguments: given, refused: message)
+        } catch {
+            report.tool(name, arguments: given, refused: "\(error)")
+        }
+        return
+    }
     let action: SurfaceEvent.Action
     let control: String
     if let id = step.press { control = id; action = .pressed }
@@ -108,7 +130,7 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
     else if let id = step.toggle { control = id; action = .toggled(step.to ?? true) }
     else if let id = step.pick, case .string(let value)? = step.value { control = id; action = .picked(value) }
     else if let id = step.change, case .number(let value)? = step.value { control = id; action = .changed(value) }
-    else { throw CLIError("A script step does nothing: give it wait, visible, press, edit, end, toggle, pick or change.") }
+    else { throw CLIError("A script step does nothing: give it wait, visible, press, edit, end, toggle, pick, change or tool.") }
     let surface = step.on ?? Surface.notchPage
     let event = SurfaceEvent(surface: surface, widget: step.widget, control: control, action: action, screen: step.screen, item: step.item)
     host.userActed()
@@ -282,6 +304,29 @@ private final class CheckReport: @unchecked Sendable {
 
     func deny(_ names: Set<String>) { lock.withLock { denied = names.sorted() } }
 
+    /// Tool calls the script made, and what came back.
+    private var tools: [[String: Any]] = []
+
+    /// The tools the add-on last offered.
+    func lastTools() -> [AddOnTool] {
+        lock.withLock { (try? last[Surface.aiTool]?.decode([AddOnTool].self)) ?? [] }
+    }
+
+    func tool(_ name: String, arguments: JSONValue, result: ToolResult) {
+        let object = (try? JSONSerialization.jsonObject(with: JSONEncoder().encode(result), options: [.fragmentsAllowed])) ?? NSNull()
+        lock.withLock {
+            tools.append(["tool": name, "result": object])
+            timeline.append("tool \(name): answered")
+        }
+    }
+
+    func tool(_ name: String, arguments: JSONValue, refused reason: String) {
+        lock.withLock {
+            tools.append(["tool": name, "refused": reason])
+            timeline.append("tool \(name): refused, \(reason)")
+        }
+    }
+
     /// A call refused because its capability was turned off: what Ledge does, and what the add-on has to handle.
     func call(_ method: String, denied capability: String) {
         lock.withLock {
@@ -368,6 +413,7 @@ private final class CheckReport: @unchecked Sendable {
         case .lockScreenRow?, .menuBarTiles?: needs("0.11.0", "Lock screen rows and menu bar tiles")
         case .widgets(let list)?:
             if list.contains(where: { $0.size != .small }) { needs("0.15.0", "A medium or large widget") }
+        case .tools?: needs("0.16.0", "Tools for AI apps")
         default: break
         }
     }
@@ -426,6 +472,7 @@ private final class CheckReport: @unchecked Sendable {
                 },
                 "calls": calls,
                 "denied": denied,
+                "tools": tools,
                 "problems": problems,
                 "warnings": warnings,
                 "timeline": timeline,
