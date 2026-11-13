@@ -12,7 +12,8 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
       Builds a .ledgeaddon you can load in Ledge (Settings, Add-on Store, Load Add-on…), ad-hoc signed.
   ledgekit validate [<folder> | <addon.json>] [--submit]
       Checks an add-on folder the way LedgeAddOns does, or just a manifest.
-  ledgekit check [<folder> | <Name.ledgeaddon>] [--script steps.json] [--report report.json] [--no-build]
+  ledgekit check [<folder> | <Name.ledgeaddon>] [--script steps.json] [--report report.json] [--deny hud,…|all]
+                 [--no-build]
       Runs the add-on with no Ledge, the way Ledge would: every surface it sends checked as Ledge checks it,
       its calls to Ledge answered or refused, and a report of what Ledge would make of it.
       A script is a JSON list of steps, run in order. Each acts on the notch page unless "on" names a surface
@@ -20,6 +21,8 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
         {"wait": 1}  {"visible": ["widget"]}  {"press": "refresh", "on": "widget"}  {"edit": "body", "text": "…"}
         {"end": "body", "text": "…"}  {"toggle": "sounds", "to": true}  {"pick": "units", "value": "c"}  {"change": "volume", "value": 0.5}
       With no script it waits, shows every declared surface, waits, then hides them.
+      --deny turns capabilities off, as a person can in Ledge: calls that need them are refused, which isn't a
+      problem, but the add-on must keep running and say what it can't do.
   ledgekit run [<folder> | <Name.ledgeaddon>] [--no-build]
       Installs it in your Ledge and says whether it started. Needs Ledge's Developer Mode (Add-on Store, ⋯).
   ledgekit shots [<folder> | <Name.ledgeaddon>] [--out shots] [--shape notch,pill] [--width compact,regular,large]
