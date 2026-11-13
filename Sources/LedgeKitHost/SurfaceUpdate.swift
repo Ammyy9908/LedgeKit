@@ -15,6 +15,7 @@ public enum SurfaceUpdate: Sendable, Equatable {
     case notchPage(NotchPage?)
     /// Nil takes it down.
     case player(PlayerExtension?)
+    case tools([AddOnTool])
 
     /// The surface name the topic belongs to, as `addon.json` lists it; nil for a topic Ledge doesn't know.
     public static func surface(forTopic topic: String) -> String? {
@@ -27,6 +28,7 @@ public enum SurfaceUpdate: Sendable, Equatable {
         case Surface.menuBarTilesTopic: Surface.menuBarTile
         case Surface.notchPageTopic: Surface.notchPage
         case Surface.playerTopic: Surface.player
+        case Surface.aiToolsTopic: Surface.aiTool
         default: nil
         }
     }
@@ -66,6 +68,10 @@ public enum SurfaceUpdate: Sendable, Equatable {
             let page = payload == .null ? nil : try payload.decode(NotchPage.self)
             try page?.validate()
             return .notchPage(page)
+        case Surface.aiToolsTopic:
+            let tools = try payload.decode([AddOnTool].self)
+            try AddOnTool.validate(tools)
+            return .tools(tools)
         case Surface.playerTopic:
             let player = payload == .null ? nil : try payload.decode(PlayerExtension.self)
             try player?.validate()

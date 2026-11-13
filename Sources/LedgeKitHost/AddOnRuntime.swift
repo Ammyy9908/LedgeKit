@@ -122,6 +122,17 @@ public actor AddOnRuntime {
         return try await send(Surface.eventMethod, params: params, timeout: timeout ?? limits.request)
     }
 
+    /// Runs one of the add-on's tools for an AI app (`ledge.tool`, LedgeKit 0.16.0), and checks what comes back. The
+    /// arguments must already be checked against the tool (`AddOnTool.check`). The add-on's refusal arrives as
+    /// `addOnError` with its message; a result over Ledge's limit throws.
+    public func runTool(_ call: ToolCall, timeout: TimeInterval = Surface.toolTimeout) async throws -> ToolResult {
+        guard state == .running else { throw AddOnRuntimeError.notRunning }
+        let reply = try await send(Surface.toolMethod, params: JSONValue(encoding: call), timeout: timeout)
+        let result = try reply.decode(ToolResult.self)
+        try result.validate()
+        return result
+    }
+
     /// Asks a player action's state for a song, or sets it (`ledge.playerAction`). Nil when the add-on doesn't know.
     public func playerAction(_ request: PlayerActionRequest, timeout: TimeInterval? = nil) async throws -> Bool? {
         guard state == .running else { throw AddOnRuntimeError.notRunning }

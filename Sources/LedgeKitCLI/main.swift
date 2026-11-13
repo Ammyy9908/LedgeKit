@@ -24,6 +24,7 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
       ("settings-page", "widget"); "screen" and "item" say which screen and row:
         {"wait": 1}  {"visible": ["widget"]}  {"press": "refresh", "on": "widget"}  {"edit": "body", "text": "…"}
         {"end": "body", "text": "…"}  {"toggle": "sounds", "to": true}  {"pick": "units", "value": "c"}  {"change": "volume", "value": 0.5}
+        {"tool": "add_note", "arguments": {"text": "…"}}: an AI app's call, arguments checked as Ledge checks them
       With no script it waits, shows every declared surface, waits, then hides them.
       --deny turns capabilities off, as a person can in Ledge: calls that need them are refused, which isn't a
       problem, but the add-on must keep running and say what it can't do. The report keeps the last version of each

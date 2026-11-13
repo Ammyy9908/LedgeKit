@@ -73,6 +73,11 @@ private func install(_ bundle: URL) throws {
     }
 }
 
+/// Whether Ledge answers on its developer socket now: developer mode is on and Ledge is running.
+func developerModeIsOn() -> Bool {
+    (try? ask(["command": "status"]))?["ok"] as? Bool == true
+}
+
 /// One request to Ledge's developer socket, and its reply.
 private func ask(_ request: [String: Any]) throws -> [String: Any] {
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)

@@ -105,6 +105,20 @@ Read this before changing anything, and keep to it.
   `apple-music-queue`, `apple-music-controls`, `notification-banners`. Settings, the environment and `dataFolder`
   need none.
 
+## Tools for AI apps
+
+An add-on can offer actions to AI apps (Claude, Cursor, Codex) through Ledge: declare `"ai-tool"` in surfaces, send
+`AddOnSession.show(tools:)`, and answer `handlers.onTool`. Nothing reaches it until the person turns AI apps on in Ledge,
+allows the app and turns the add-on's tools on.
+
+- Name tools for what they do (`add_note`), and write the summary for a reader who has never seen the add-on.
+- Declare every argument with its kind and limits; Ledge refuses calls that don't fit before you see them. Still treat
+  arguments as untrusted: they may come from a web page the model read. Never run or open what an argument names.
+- Mark a tool `destructive: true` if it deletes, overwrites or sends anything; Ledge then asks the person every time.
+- Refuse with `AddOnError("A sentence the AI app can act on")`. Keep calls under 30 seconds and results small.
+- Test with check script steps: `{"tool": "add_note", "arguments": {"text": "Oat milk"}}`; the report's `tools` has
+  each result or refusal. Needs `kit.minAPI` 0.16.0.
+
 ## What the program may do
 
 An add-on is an ordinary Mac program running as the user, not sandboxed: it can read files, run tools like
