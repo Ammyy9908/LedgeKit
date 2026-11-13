@@ -92,6 +92,10 @@ Read this before changing anything, and keep to it.
   default notch width (288 at Compact, 428 at Large). Plan for two or three short lines; anything taller is cut off at
   the bottom. A row with a `spacer` in it spans the full width, so the spacer pushes what follows to the right edge.
 - **Notch page**: 348 points wide by default, and 122, 202 or 282 points tall for `small`, `medium` and `large`.
+  On a display with a camera notch, its header sits either side of the camera: about 39 points a side at Compact,
+  69 at Regular. Keep titles short; Ledge truncates them rather than put them under the camera.
+- **Live activity**: a symbol and a short text. Beside a camera notch the text gets about 64 points; as a pill on a
+  display without one, the capsule's width; in the card below the notch, about 125. Write it to fit 64.
 - **Settings page**: rows in Ledge's Settings window. A `button` row's button reads the row's `title`; its `detail`
   is the label beside it.
 - **Categories** (`category` in addon.json and listing.json): AI, Productivity, Media, Capture, Files or System.
@@ -116,7 +120,8 @@ Use the `ledgekit` MCP tools when you have them; otherwise the same commands in 
 3. `ledgekit check --report check/report.json` (`ledgekit_check`). It runs the add-on with no Ledge and says what
    Ledge would refuse. **You're not done while it reports problems.** Read the warnings too.
 4. `ledgekit shots --out shots` (`ledgekit_shots`) when the user's Ledge has Developer Mode on: Ledge draws each
-   surface into a PNG. **Look at them**; a surface that passes check can still look wrong.
+   surface into a PNG, in every shape people meet it in: each notch width, beside a camera and as a pill.
+   **Look at them, the narrowest first** (`@notch-compact`); a surface that passes check can still look wrong.
 5. `ledgekit validate` (`ledgekit_validate`) before saying it's ready, and `ledgekit validate --submit` before a pull
    request to LedgeAddOns.
 

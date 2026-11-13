@@ -22,8 +22,11 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
       With no script it waits, shows every declared surface, waits, then hides them.
   ledgekit run [<folder> | <Name.ledgeaddon>] [--no-build]
       Installs it in your Ledge and says whether it started. Needs Ledge's Developer Mode (Add-on Store, ⋯).
-  ledgekit shots [<folder> | <Name.ledgeaddon>] [--out shots] [--no-build] [--no-install]
-      Installs it, then has Ledge draw each of its surfaces into PNGs, exactly as Ledge draws them.
+  ledgekit shots [<folder> | <Name.ledgeaddon>] [--out shots] [--shape notch,pill] [--width compact,regular,large]
+                [--no-build] [--no-install]
+      Installs it, then has Ledge draw each of its surfaces into PNGs, exactly as Ledge draws them: the notch page and
+      widgets at every notch width, on a display with a notch and one where Ledge is a pill (name@shape-width.png),
+      and live activities beside the notch, as the pill and below the notch (name@shape.png). Look at the narrowest.
   ledgekit submit [<folder>] [--print] [--repo <LedgeAddOns checkout>]
       Checks it the way review will, then opens a pull request adding it to LedgeAddOns. --print only shows what.
   ledgekit agent [<folder>] [--force]

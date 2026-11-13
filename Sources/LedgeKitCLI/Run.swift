@@ -23,16 +23,35 @@ func shots(_ given: [String]) throws {
     let skipBuild = flag("--no-build", in: &arguments)
     let skipInstall = flag("--no-install", in: &arguments)
     let out = URL(fileURLWithPath: option("--out", in: &arguments) ?? "shots", isDirectory: true).standardizedFileURL
+    let shapes = try choices(option("--shape", in: &arguments), from: ["notch", "pill"], for: "--shape")
+    let widths = try choices(option("--width", in: &arguments), from: ["compact", "regular", "large"], for: "--width")
     let (bundle, manifest) = try builtBundle(arguments, build: !skipBuild && !skipInstall)
     if !skipInstall { try install(bundle) }
-    let reply = try ask(["command": "shots", "id": manifest.id, "out": out.path])
+    let reply = try ask(["command": "shots", "id": manifest.id, "out": out.path, "shapes": shapes, "widths": widths])
     guard reply["ok"] as? Bool == true else { throw CLIError("Ledge couldn't draw it: \(reply["error"] as? String ?? "no reason given")") }
     let files = reply["files"] as? [String] ?? []
-    print(files.isEmpty ? "Ledge holds nothing of \(manifest.name)'s to draw yet." : "Drew \(files.count) surface\(files.count == 1 ? "" : "s"):")
-    for file in files { print("  \(file)") }
+    print(files.isEmpty ? "Ledge holds nothing of \(manifest.name)'s to draw yet." : "Drew \(files.count) picture\(files.count == 1 ? "" : "s") in \(out.path):")
+    // One line per surface: its name, then each shape and width it was drawn in.
+    let grouped = Dictionary(grouping: files.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent }) {
+        $0.split(separator: "@").first.map(String.init) ?? $0
+    }
+    for (surface, names) in grouped.sorted(by: { $0.key < $1.key }) {
+        let variants = names.compactMap { $0.split(separator: "@").dropFirst().first.map(String.init) }.sorted()
+        print("  \(surface)" + (variants.isEmpty ? "" : ": " + variants.joined(separator: ", ")))
+    }
     for (surface, reason) in (reply["skipped"] as? [String: String] ?? [:]).sorted(by: { $0.key < $1.key }) {
         print("! \(surface): \(reason)")
     }
+}
+
+/// A comma-separated choice, like "notch,pill"; every one when it's missing or "all".
+private func choices(_ given: String?, from all: [String], for name: String) throws -> [String] {
+    guard let given, given != "all" else { return all }
+    let picked = given.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    for value in picked where !all.contains(value) {
+        throw CLIError("\(name) takes \(all.joined(separator: ", ")) or all, not \"\(value)\".")
+    }
+    return picked
 }
 
 /// The .ledgeaddon to send: the one given, or the folder's, built first.
