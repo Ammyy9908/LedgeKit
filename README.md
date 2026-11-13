@@ -311,6 +311,18 @@ steps: `{"wait": 1}`, `{"visible": ["notch-page"]}`, `{"press": "new", "screen":
 `{"pick": "id", "value": "x"}` and `{"change": "id", "value": 0.5}`. Steps act on the notch page unless `on` says
 otherwise.
 
+In your own Ledge, with **Developer Mode** turned on (Settings, Add-on Store, ⋯, Developer Mode; it asks first and
+turns off when Ledge quits):
+
+```sh
+ledgekit run                       # installs it without the trust prompt and says whether it started
+ledgekit shots --out shots         # installs it, then Ledge draws each of its surfaces into PNGs
+```
+
+`shots` draws the notch page's current screen, each widget, the settings page, the lock screen pill and the menu bar
+tiles exactly as Ledge draws them; live activities aren't drawn yet. Ledge listens on a socket in a folder only your
+account can open, and only while developer mode is on.
+
 `LedgeKitHost` is also a library of its own: the runtime that runs an add-on, its session records and the package
 reader, shared by Ledge and the checker.
 

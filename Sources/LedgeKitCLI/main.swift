@@ -15,6 +15,10 @@ ledgekit \(SessionProtocol.apiLevel): build Ledge add-ons
   ledgekit check [<folder> | <Name.ledgeaddon>] [--script steps.json] [--report report.json] [--no-build]
       Runs the add-on with no Ledge, the way Ledge would: every surface it sends checked as Ledge checks it,
       its calls to Ledge answered or refused, and a report of what Ledge would make of it.
+  ledgekit run [<folder> | <Name.ledgeaddon>] [--no-build]
+      Installs it in your Ledge and says whether it started. Needs Ledge's Developer Mode (Add-on Store, ⋯).
+  ledgekit shots [<folder> | <Name.ledgeaddon>] [--out shots] [--no-build] [--no-install]
+      Installs it, then has Ledge draw each of its surfaces into PNGs, exactly as Ledge draws them.
   ledgekit version
       The LedgeKit this tool belongs to.
 
@@ -33,6 +37,8 @@ do {
     case "build": try build(arguments)
     case "validate": exit(try validate(arguments) ? 0 : 1)
     case "check": exit(try await check(arguments) ? 0 : 1)
+    case "run": try runInLedge(arguments)
+    case "shots": try shots(arguments)
     case "version", "--version": print(SessionProtocol.apiLevel)
     case "help", "--help", "-h": print(usage, terminator: "")
     default:
