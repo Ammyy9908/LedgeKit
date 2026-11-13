@@ -16,7 +16,7 @@ import Foundation
 public enum SessionProtocol {
     public static let version = 2
     /// The LedgeKit API level this build speaks. Ledge refuses an add-on that needs a newer one.
-    public static let apiLevel = "0.13.0"
+    public static let apiLevel = "0.14.0"
     /// The longest message in either direction, newline excluded.
     public static let maximumMessageBytes = 1_048_576
 
