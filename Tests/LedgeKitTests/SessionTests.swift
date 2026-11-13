@@ -187,6 +187,23 @@ private let hello = SessionMessage.hello(protocolVersion: 2, apiLevel: SessionPr
     #expect(await seen.all == ["dark"])
 }
 
+@Test func visibilityChangesReachTheAddOnInOrder() async throws {
+    let seen = Seen()
+    var handlers = AddOnHandlers()
+    handlers.onVisibilityChange = { visibility in
+        await seen.add(visibility.isVisible(Surface.notchPage) ? "page" : (visibility.isAnythingVisible ? "other" : "none"))
+    }
+    let states = [SurfaceVisibility(visible: [Surface.notchPage]), SurfaceVisibility(visible: [Surface.widget]), SurfaceVisibility()]
+    var messages: [SessionMessage] = [hello, .request(id: 1, method: SessionProtocol.Method.activate, params: .null)]
+    for (offset, state) in states.enumerated() {
+        messages.append(.request(id: 10 + offset, method: SessionProtocol.Method.visibilityChanged, params: try JSONValue(encoding: state)))
+    }
+    let (status, out) = await session(handlers, messages: messages)
+    #expect(status == 0)
+    #expect(out.contains(.response(id: 12, result: .bool(true), error: nil)))
+    #expect(await seen.all == ["page", "other", "none"])
+}
+
 private actor Seen {
     var all: [String] = []
     func add(_ value: String) { all.append(value) }

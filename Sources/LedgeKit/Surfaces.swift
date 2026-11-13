@@ -67,7 +67,13 @@ public enum Surface {
 /// The add-on's settings page: sections of rows, drawn in Ledge's own cards under the add-on's header.
 public struct SettingsPage: Codable, Sendable, Equatable {
     public var sections: [SettingsSection]
-    public init(_ sections: [SettingsSection]) { self.sections = sections }
+    /// Words that find the page in Ledge's Settings search besides the add-on's name, like "markdown" for Notes.
+    /// Up to 20, each up to 40 characters. Needs 0.13.0.
+    public var keywords: [String]?
+    public init(_ sections: [SettingsSection], keywords: [String] = []) {
+        self.sections = sections
+        self.keywords = keywords.isEmpty ? nil : keywords
+    }
 }
 
 public struct SettingsSection: Codable, Sendable, Equatable {
@@ -91,12 +97,29 @@ public struct SettingsRow: Codable, Sendable, Equatable {
     /// A grey line under the title.
     public var detail: String?
     public var control: Control
+    /// For a button: Ledge asks first, in its own alert, and sends `pressed` only when the user confirms.
+    /// Needs 0.13.0.
+    public var confirm: Confirmation?
 
-    public init(_ id: String, title: String, detail: String? = nil, control: Control) {
+    public init(_ id: String, title: String, detail: String? = nil, control: Control, confirm: Confirmation? = nil) {
         self.id = id
         self.title = title
         self.detail = detail
         self.control = control
+        self.confirm = confirm
+    }
+
+    /// What Ledge asks before a button runs: "Delete all notes?", what it means, and the word on the button.
+    public struct Confirmation: Codable, Sendable, Equatable {
+        public var title: String
+        public var message: String?
+        /// The button that goes ahead, like "Delete". Cancel is always there too.
+        public var confirmTitle: String
+        public init(_ title: String, message: String? = nil, confirmTitle: String) {
+            self.title = title
+            self.message = message
+            self.confirmTitle = confirmTitle
+        }
     }
 
     public enum Control: Codable, Sendable, Equatable {
@@ -138,8 +161,9 @@ public struct SettingsRow: Codable, Sendable, Equatable {
     public static func textField(_ id: String, _ title: String, detail: String? = nil, text: String, placeholder: String? = nil) -> SettingsRow {
         SettingsRow(id, title: title, detail: detail, control: .textField(text: text, placeholder: placeholder))
     }
-    public static func button(_ id: String, _ title: String, detail: String? = nil, destructive: Bool = false) -> SettingsRow {
-        SettingsRow(id, title: title, detail: detail, control: .button(destructive: destructive))
+    public static func button(_ id: String, _ title: String, detail: String? = nil, destructive: Bool = false,
+                              confirm: Confirmation? = nil) -> SettingsRow {
+        SettingsRow(id, title: title, detail: detail, control: .button(destructive: destructive), confirm: confirm)
     }
     public static func link(_ id: String, _ title: String, url: String) -> SettingsRow {
         SettingsRow(id, title: title, control: .link(url: url))
@@ -314,15 +338,34 @@ public struct LiveActivity: Codable, Sendable, Equatable {
     public var importance: Importance
     /// Seconds it stays after this send, or nil to stay until the add-on takes it down.
     public var lasts: Double?
+    /// What the activity is about, when it's one of the things Ledge shows itself. Nil is anything else. Needs 0.13.0.
+    public var kind: Kind?
+    /// What VoiceOver says for the activity, when the text alone doesn't, like "4 minutes 59 seconds left" for
+    /// "4:59". Up to 120 characters. Needs 0.13.0.
+    public var accessibilityValue: String?
 
     public init(_ id: String, symbol: String, text: String, progress: Progress? = nil,
-                importance: Importance = .normal, lasts: Double? = nil) {
+                importance: Importance = .normal, lasts: Double? = nil, kind: Kind? = nil, accessibilityValue: String? = nil) {
         self.id = id
         self.symbol = symbol
         self.text = text
         self.progress = progress
         self.importance = importance
         self.lasts = lasts
+        self.kind = kind
+        self.accessibilityValue = accessibilityValue
+    }
+
+    /// Kinds of activity Ledge has of its own. While Ledge's own of the same kind is up, the add-on's isn't shown,
+    /// with the placement `duplicatesBuiltIn`, so there are never two of the same thing beside the notch. Declare a
+    /// kind only when the activity really is one: it never wins a place, it only steps aside.
+    public enum Kind: String, Codable, Sendable, Equatable {
+        /// A song or podcast playing. Ledge's own is the song in the notch.
+        case nowPlaying
+        /// A download in progress. Ledge's own is the download ring.
+        case download
+        /// The screen or audio being recorded. Ledge's own is the recording indicator.
+        case recording
     }
 
     public enum Progress: Codable, Sendable, Equatable {
@@ -334,8 +377,12 @@ public struct LiveActivity: Codable, Sendable, Equatable {
     /// Orders an add-on's activity among other add-ons'. All of them rank below Ledge's own.
     public enum Importance: String, Codable, Sendable, Comparable {
         case low, normal, high
+        /// Something to act on now: a timer that rang, a build that failed. Above `.high`, still below Ledge's own,
+        /// and it lets the add-on open its page without a click (`LedgeHost.showPage()`). Use it only while that's
+        /// true. Needs 0.13.0.
+        case attention
         public static func < (a: Importance, b: Importance) -> Bool {
-            let order: [Importance] = [.low, .normal, .high]
+            let order: [Importance] = [.low, .normal, .high, .attention]
             return order.firstIndex(of: a)! < order.firstIndex(of: b)!
         }
     }
@@ -353,6 +400,11 @@ public enum ActivityPlacement: String, Codable, Sendable, Equatable {
     case suppressed
     /// Not up: it ended, ran out its time, or was taken down.
     case idle
+    /// Not shown while Ledge's own activity of the same `kind` is up. It comes back when that one ends. 0.13.0.
+    case duplicatesBuiltIn
+    /// Stepped aside after saying the same thing for half an hour at `.high` or `.attention`. Sending something
+    /// different brings it back. Only for add-ons built for 0.13.0 or later. 0.13.0.
+    case stale
 }
 
 /// Sent to `AddOnHandlers.onActivityPlacement` when an activity's place changes.
@@ -634,6 +686,10 @@ public enum SurfaceValidationError: Error, Equatable, CustomStringConvertible {
 extension SettingsPage {
     /// The checks Ledge runs before drawing the page.
     public func validate() throws {
+        if let keywords {
+            guard keywords.count <= 20, keywords.allSatisfy({ !$0.isEmpty && $0.count <= 40 })
+            else { throw SurfaceValidationError.invalid("keywords") }
+        }
         var ids = Set<String>()
         var rows = 0
         for section in sections {
@@ -645,6 +701,12 @@ extension SettingsPage {
                 guard ids.insert(row.id).inserted else { throw SurfaceValidationError.duplicateID(row.id) }
                 try checkText(row.title)
                 try checkText(row.detail)
+                if let confirm = row.confirm {
+                    guard case .button = row.control else { throw SurfaceValidationError.invalid("confirm on \(row.id), which isn't a button") }
+                    guard !confirm.title.isEmpty, confirm.title.count <= 120, !confirm.confirmTitle.isEmpty, confirm.confirmTitle.count <= 30
+                    else { throw SurfaceValidationError.invalid("confirm of \(row.id)") }
+                    try checkText(confirm.message)
+                }
                 switch row.control {
                 case let .picker(options, selected):
                     guard !options.isEmpty, options.count <= 50, options.contains(where: { $0.id == selected }),
@@ -841,6 +903,9 @@ extension LiveActivity {
                 throw SurfaceValidationError.invalid("progress of \(activity.id)")
             }
             if let lasts = activity.lasts, !(1...600).contains(lasts) { throw SurfaceValidationError.invalid("lasts of \(activity.id)") }
+            if let value = activity.accessibilityValue, value.isEmpty || value.count > 120 {
+                throw SurfaceValidationError.invalid("accessibilityValue of \(activity.id)")
+            }
         }
     }
 }

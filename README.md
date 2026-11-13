@@ -217,6 +217,25 @@ handlers.onEvent = { event in
   Ledge keeps their text if the screen is sent again meanwhile.
 - Limits: 200 parts per screen, 100 rows per list, 3 header buttons, one editor of up to 50,000 characters.
 
+## Good add-ons (0.13.0)
+
+```swift
+handlers.onVisibilityChange = { visibility in            // which of your surfaces are on screen
+    if visibility.isVisible(Surface.notchPage) { await notes.reload() }
+}
+let folder = try await LedgeHost.dataFolder()            // your own files, kept through updates
+try await LedgeHost.showPage()                           // just after a press, or for an .attention activity
+try await LedgeHost.openSettings()                       // just after a press, for a "Set up" button
+try await LedgeHost.holdOpen(true)                       // while something the user watches runs
+```
+
+- `showPage` and `holdOpen` need the `notch-control` capability. Ledge refuses `showPage` from a timer.
+- `LiveActivity` gains `kind` (`.nowPlaying`, `.download`, `.recording`), which steps aside for Ledge's own of the
+  same kind (placement `duplicatesBuiltIn`), and `accessibilityValue`. `.attention` sits above `.high`. A `.high`
+  or `.attention` activity that says the same thing for half an hour is placed `stale` until it changes.
+- A settings button can ask first: `.button(id, title, destructive: true, confirm: .init(...))`. A page can carry
+  `keywords` for Ledge's Settings search.
+
 ## Implement a worker (protocol 1)
 
 ```swift

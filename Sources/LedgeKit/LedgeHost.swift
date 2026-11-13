@@ -18,6 +18,10 @@ public enum LedgeHost {
         public static let notify = "ledge.notify"
         public static let account = "ledge.account"
         public static let http = "ledge.http"
+        public static let dataFolder = "ledge.dataFolder"
+        public static let showPage = "ledge.showPage"
+        public static let openSettings = "ledge.openSettings"
+        public static let holdOpen = "ledge.holdOpen"
     }
 
     /// The longest Ledge takes to answer a call before it throws.
@@ -48,6 +52,42 @@ public enum LedgeHost {
 
     public static func environment() async throws -> HostEnvironment {
         try await call(Method.environment, [:]).decode(HostEnvironment.self)
+    }
+
+    // MARK: Files
+
+    /// A folder of the add-on's own for files it keeps, such as documents or a cache: created when first asked for,
+    /// kept through updates and reinstalls, and deleted only when the user removes the add-on and asks for its data
+    /// to go too. Nothing else writes there. Needs 0.13.0.
+    public static func dataFolder() async throws -> URL {
+        guard case .string(let path) = try await call(Method.dataFolder, [:]), path.hasPrefix("/") else {
+            throw LedgeHostError("Ledge didn't say where the data folder is.")
+        }
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    // MARK: The notch and Settings
+
+    /// Opens the notch on the add-on's page. Ledge allows it within two seconds of the user using one of the
+    /// add-on's controls, or while one of its activities is `.attention`, so a page can't pop open on a timer.
+    /// Refused while the notch is hidden, such as over a full-screen app, or while the user types in another page.
+    /// Needs the `notch-control` capability and the `notch-page` surface. Needs 0.13.0.
+    public static func showPage() async throws {
+        _ = try await call(Method.showPage, [:])
+    }
+
+    /// Opens Ledge's Settings on the add-on's page, for a "Set up" button in an empty state. Allowed within two
+    /// seconds of the user using one of the add-on's controls. Needs 0.13.0.
+    public static func openSettings() async throws {
+        _ = try await call(Method.openSettings, [:])
+    }
+
+    /// Keeps the open notch from closing when the pointer leaves, while something the user watches runs: a
+    /// countdown, a teleprompter. It counts only while the add-on's page is the tab showing, a click elsewhere still
+    /// closes the notch, and Ledge lets go when the add-on stops. Release it the moment the work ends.
+    /// Needs the `notch-control` capability. Needs 0.13.0.
+    public static func holdOpen(_ on: Bool) async throws {
+        _ = try await call(Method.holdOpen, ["on": .bool(on)])
     }
 
     // MARK: Actions
@@ -113,6 +153,24 @@ public struct HostEnvironment: Codable, Sendable, Equatable {
         self.accentColor = accentColor
         self.hasNotch = hasNotch
     }
+}
+
+/// Which of an add-on's surfaces someone can see right now, sent to `AddOnHandlers.onVisibilityChange` whenever it
+/// changes. A surface counts while it's on screen: the notch page while its tab is open, widgets while the Widgets
+/// page is open, the settings page while it's shown in Settings, and menu bar tiles while the panel is open.
+/// Live activities, lock screen pills and the player aren't listed: they're up while you send them.
+public struct SurfaceVisibility: Codable, Sendable, Equatable {
+    /// Surface names from `Surface`, such as `Surface.notchPage`.
+    public var visible: Set<String>
+
+    public init(visible: Set<String> = []) {
+        self.visible = visible
+    }
+
+    public func isVisible(_ surface: String) -> Bool { visible.contains(surface) }
+
+    /// True while anything of the add-on's is on screen.
+    public var isAnythingVisible: Bool { !visible.isEmpty }
 }
 
 public struct HostAccount: Codable, Sendable, Equatable {
