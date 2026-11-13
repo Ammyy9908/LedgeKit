@@ -1,9 +1,10 @@
 name: API reference
-# Builds LedgeKit's API reference with DocC and publishes it to GitHub Pages, for every release tag.
+# Builds LedgeKit's API reference with DocC and publishes it to GitHub Pages whenever main changes, which is
+# where releases land. Pages' default environment rule deploys from main only, so tags aren't used here.
 # Needs Pages turned on with "GitHub Actions" as the source (Settings, Pages).
 on:
   push:
-    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
