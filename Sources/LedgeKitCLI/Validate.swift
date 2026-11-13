@@ -114,6 +114,7 @@ private func check(_ folder: URL, into report: inout Report) {
         if let image = NSImage(contentsOf: iconFile), let rep = image.representations.first {
             if rep.pixelsWide != rep.pixelsHigh { report.errors.append("Assets/Icon.png must be square; it's \(rep.pixelsWide)×\(rep.pixelsHigh).") }
             if rep.pixelsWide < 256 { report.warnings.append("Assets/Icon.png is \(rep.pixelsWide) pixels; use at least 256, ideally 1024.") }
+            if rep.pixelsWide > 2048 { report.errors.append("Assets/Icon.png is \(rep.pixelsWide) pixels; Ledge takes at most 2048. Use 1024.") }
         } else {
             report.errors.append("Assets/Icon.png isn't a PNG Ledge can read.")
         }

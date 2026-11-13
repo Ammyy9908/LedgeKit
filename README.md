@@ -298,7 +298,21 @@ swift test                                    # includes every surface checked a
 ledgekit build                                # .build/addons/<Name>.ledgeaddon, ad-hoc signed
 ledgekit validate                             # what LedgeAddOns checks; --submit makes to-dos errors
 ledgekit validate addon.json                  # the manifest alone
+ledgekit check                                # runs it with no Ledge and reports what Ledge would make of it
+ledgekit check --script steps.json --report report.json
 ```
+
+`check` starts the built add-on with `LedgeKitHost`'s runtime, the one Ledge uses, reads every surface it sends
+with the reader Ledge uses, and answers its calls to Ledge as Ledge would: allowed, or refused for a missing
+capability or outside the moments Ledge allows. It names surfaces Ledge would refuse, ones declared and never sent,
+and anything newer than `kit.minAPI`, and exits 1 if Ledge wouldn't run it as it is. A script is a JSON list of
+steps: `{"wait": 1}`, `{"visible": ["notch-page"]}`, `{"press": "new", "screen": "list"}`,
+`{"edit": "body", "text": "…"}`, `{"end": "body", "text": "…"}`, `{"toggle": "id", "on": "settings-page", "to": true}`,
+`{"pick": "id", "value": "x"}` and `{"change": "id", "value": 0.5}`. Steps act on the notch page unless `on` says
+otherwise.
+
+`LedgeKitHost` is also a library of its own: the runtime that runs an add-on, its session records and the package
+reader, shared by Ledge and the checker.
 
 `new` splits an add-on into `<Name>Core`, which holds its state and builds what Ledge draws, and the executable,
 which only runs the session, so the surfaces are testable without Ledge. `validate` exits 0 when the folder is
