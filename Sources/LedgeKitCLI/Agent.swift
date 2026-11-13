@@ -131,6 +131,8 @@ A green build isn't the end. Check, then look.
 ## Rules that aren't negotiable
 
 - Surfaces in `addon.json` and what the code sends agree. Capabilities: list what you use, nothing more.
+- Move to a new LedgeKit with `ledgekit update` (`ledgekit_update`), never by editing the pin by hand. It leaves
+  `kit.minAPI` alone; `--raise` (`raise: true`) only when the add-on starts using something the new release added.
 - Never pin LedgeKit to a local path. `Package.swift` depends on https://github.com/Ammyy9908/LedgeKit.git at an exact
   release, and `kit.minAPI` in `addon.json` is at least the LedgeKit whose features you use (check flags it).
 - Raise `version` in `addon.json` for every release and add a `## <version>` entry at the top of `CHANGELOG.md`.

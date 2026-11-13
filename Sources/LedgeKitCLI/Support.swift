@@ -1,6 +1,9 @@
 import Foundation
 import LedgeKit
 
+/// Where add-ons get LedgeKit: they pin it by this URL, at an exact release.
+let kitURL = "https://github.com/Ammyy9908/LedgeKit.git"
+
 /// A failure the user can act on, printed as it is.
 struct CLIError: Error {
     let message: String
