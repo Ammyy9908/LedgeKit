@@ -94,7 +94,8 @@ public struct SettingsRow: Codable, Sendable, Equatable {
     /// Stable within the page; events name the row by it.
     public var id: String
     public var title: String
-    /// A grey line under the title.
+    /// A grey line under the title. For a button, the label beside it: the button itself reads `title`, like
+    /// "Delete all notes…" beside "Notes in the Trash are kept 30 days".
     public var detail: String?
     public var control: Control
     /// For a button: Ledge asks first, in its own alert, and sends `pressed` only when the user confirms.
@@ -127,6 +128,7 @@ public struct SettingsRow: Codable, Sendable, Equatable {
         case picker(options: [Option], selected: String)
         case slider(minimum: Double, maximum: Double, step: Double?, value: Double, unit: String?)
         case textField(text: String, placeholder: String?)
+        /// A button reading the row's `title`, with the row's `detail` as the label beside it. Sends `pressed`.
         case button(destructive: Bool)
         case link(url: String)
         /// Read-only text on the right.

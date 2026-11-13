@@ -28,8 +28,10 @@ public struct AddOnManifest: Codable, Sendable, Equatable {
     public let minLedge: String?
     /// The oldest macOS that runs it, for example "14.0", when it needs more than Ledge does.
     public let minMacOS: String?
-    /// The Store section it belongs in: AI, Productivity, Media, Capture, Files or System.
+    /// The Store section it belongs in, one of ``categories``.
     public let category: String?
+    /// The Store's sections. LedgeAddOns refuses any other `category`; Ledge itself doesn't check it.
+    public static let categories = ["AI", "Productivity", "Media", "Capture", "Files", "System"]
     public let creator: Creator?
     public let source: Source?
     /// Search words beyond the name and summary.

@@ -86,6 +86,27 @@ Read this before changing anything, and keep to it.
 - `addon.json` names the add-on, the **surfaces** it shows and the **capabilities** it asks for. They must match what
   the code does: Ledge refuses a surface that isn't declared, and a call whose capability isn't listed.
 
+## What Ledge gives each surface
+
+- **Widget**: the Widgets page shows one widget at a time, under a title strip, in about **348 × 78 points** at the
+  default notch width (288 at Compact, 428 at Large). Plan for two or three short lines; anything taller is cut off at
+  the bottom. A row with a `spacer` in it spans the full width, so the spacer pushes what follows to the right edge.
+- **Notch page**: 348 points wide by default, and 122, 202 or 282 points tall for `small`, `medium` and `large`.
+- **Settings page**: rows in Ledge's Settings window. A `button` row's button reads the row's `title`; its `detail`
+  is the label beside it.
+- **Categories** (`category` in addon.json and listing.json): AI, Productivity, Media, Capture, Files or System.
+- **Capabilities** this LedgeKit knows: `clipboard-write` (`LedgeHost.copy`), `hud` (`LedgeHost.notify`),
+  `notch-control` (`showPage`, `openSettings`, `holdOpen`), and the account ones Ledge brokers: `spotify-library`,
+  `apple-music-queue`, `apple-music-controls`, `notification-banners`. Settings, the environment and `dataFolder`
+  need none.
+
+## What the program may do
+
+An add-on is an ordinary Mac program running as the user, not sandboxed: it can read files, run tools like
+`/usr/sbin/system_profiler` or `pmset`, and use IOKit or other system frameworks. Ledge's review reads all of it, so:
+give every process and request a deadline (a few seconds) so a hang never leaves a surface stuck, do it off the
+session's actor, read only what the add-on shows, and say in the README what it reads.
+
 ## The loop: after every change
 
 Use the `ledgekit` MCP tools when you have them; otherwise the same commands in a shell.
@@ -124,6 +145,11 @@ Replace every placeholder `ledgekit new` left: summary and description in `addon
 `README.md`, the first `CHANGELOG.md` entry, `Assets/Icon.png` (the developer's own, 1024 px, no one else's marks),
 and at least one screenshot in `Store/` named in `listing.json` (`ledgekit shots` makes good ones). Then
 `ledgekit validate --submit` must pass.
+
+## These agent files
+
+`AGENTS.md`, `CLAUDE.md`, `.cursor/` and `.mcp.json` are listed in `.gitignore` on purpose: they hold paths on this
+Mac and are for the developer's tools, so LedgeAddOns refuses them. Edit AGENTS.md freely; don't commit it.
 
 ## Docs
 

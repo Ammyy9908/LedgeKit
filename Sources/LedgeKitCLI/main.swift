@@ -15,6 +15,11 @@ ledgekit \(SessionProtocol.apiLevel): build Ledge add-ons
   ledgekit check [<folder> | <Name.ledgeaddon>] [--script steps.json] [--report report.json] [--no-build]
       Runs the add-on with no Ledge, the way Ledge would: every surface it sends checked as Ledge checks it,
       its calls to Ledge answered or refused, and a report of what Ledge would make of it.
+      A script is a JSON list of steps, run in order. Each acts on the notch page unless "on" names a surface
+      ("settings-page", "widget"); "screen" and "item" say which screen and row:
+        {"wait": 1}  {"visible": ["widget"]}  {"press": "refresh", "on": "widget"}  {"edit": "body", "text": "…"}
+        {"end": "body", "text": "…"}  {"toggle": "sounds", "to": true}  {"pick": "units", "value": "c"}  {"change": "volume", "value": 0.5}
+      With no script it waits, shows every declared surface, waits, then hides them.
   ledgekit run [<folder> | <Name.ledgeaddon>] [--no-build]
       Installs it in your Ledge and says whether it started. Needs Ledge's Developer Mode (Add-on Store, ⋯).
   ledgekit shots [<folder> | <Name.ledgeaddon>] [--out shots] [--no-build] [--no-install]
