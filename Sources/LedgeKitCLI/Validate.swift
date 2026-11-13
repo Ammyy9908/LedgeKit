@@ -56,6 +56,13 @@ private func check(_ folder: URL, into report: inout Report) {
     // The folder holds only what the Store takes.
     for name in (try? manager.contentsOfDirectory(atPath: folder.path)) ?? [] {
         if name == ".build" || name == ".swiftpm" || name == ".git" || name == ".DS_Store" { continue }
+        // Agent files and the tools' output stay on this Mac: .gitignore keeps them out, and so does LedgeAddOns.
+        if localOnly.contains(name) {
+            let ignored = (try? String(contentsOf: folder.appendingPathComponent(".gitignore"), encoding: .utf8))?
+                .split(separator: "\n").contains { $0.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")) == name } ?? false
+            if !ignored { report.errors.append("\(name) is for this Mac only. Add it to .gitignore (ledgekit agent does), so it's never committed.") }
+            continue
+        }
         if !allowedTop.contains(name) {
             report.errors.append("\(name) can't be at the top of an add-on folder. Allowed: \(allowedTop.sorted().joined(separator: ", ")).")
         }

@@ -323,6 +323,15 @@ ledgekit shots --out shots         # installs it, then Ledge draws each of its s
 tiles exactly as Ledge draws them; live activities aren't drawn yet. Ledge listens on a socket in a folder only your
 account can open, and only while developer mode is on.
 
+## With a coding agent
+
+`ledgekit new` writes `AGENTS.md` (the brief: what an add-on is, the loop to run after every change, the rules),
+`CLAUDE.md` and Cursor rules pointing to it, and `.mcp.json` wiring for `ledgekit mcp`, a Model Context Protocol
+server whose tools are the loop: doctor, new, test, build, check (its JSON report), run, shots (the pictures
+themselves), validate and docs. `ledgekit agent` writes them into an existing add-on. They stay on your Mac: the
+scaffold's `.gitignore` lists them and LedgeAddOns refuses them. For Codex, register the server once:
+`codex mcp add ledgekit -- $(which ledgekit) mcp`.
+
 `LedgeKitHost` is also a library of its own: the runtime that runs an add-on, its session records and the package
 reader, shared by Ledge and the checker.
 

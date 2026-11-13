@@ -41,6 +41,13 @@ func newAddOn(_ given: [String]) throws {
     try FileManager.default.createDirectory(at: folder.appendingPathComponent("Assets"), withIntermediateDirectories: true)
     try drawPlaceholderIcon(to: folder.appendingPathComponent("Assets/Icon.png"))
     try FileManager.default.createDirectory(at: folder.appendingPathComponent("Store"), withIntermediateDirectories: true)
+    // The brief and MCP wiring for a coding agent, kept out of git and of a submission.
+    for (path, text) in agentFiles(for: folder) {
+        let file = folder.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(text.utf8).write(to: file)
+    }
+    try ignoreLocalFiles(in: folder)
 
     print("""
     Wrote \(name) (\(id)) in \(folder.path)
@@ -50,6 +57,8 @@ func newAddOn(_ given: [String]) throws {
       swift test          # Core's tests, including every surface against Ledge's limits
       ledgekit build      # a .ledgeaddon to load in Ledge: Settings, Add-on Store, Load Add-on…
       ledgekit validate   # what LedgeAddOns checks
+
+    A coding agent reads AGENTS.md (Claude Code: CLAUDE.md) and gets the loop as tools from .mcp.json.
 
     Before you submit, replace what's yours to write: summary and description in addon.json, the listing,
     README.md, the first CHANGELOG.md entry, Assets/Icon.png (a placeholder), and screenshots in Store/.

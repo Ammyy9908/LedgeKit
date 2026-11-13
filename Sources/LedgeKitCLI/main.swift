@@ -19,6 +19,10 @@ ledgekit \(SessionProtocol.apiLevel): build Ledge add-ons
       Installs it in your Ledge and says whether it started. Needs Ledge's Developer Mode (Add-on Store, ⋯).
   ledgekit shots [<folder> | <Name.ledgeaddon>] [--out shots] [--no-build] [--no-install]
       Installs it, then has Ledge draw each of its surfaces into PNGs, exactly as Ledge draws them.
+  ledgekit agent [<folder>] [--force]
+      Writes AGENTS.md, CLAUDE.md, Cursor rules and the MCP wiring, so a coding agent knows the rules and the loop.
+  ledgekit mcp [--package <folder>]
+      A Model Context Protocol server on stdio: the loop above as tools for Claude Code, Codex or Cursor.
   ledgekit version
       The LedgeKit this tool belongs to.
 
@@ -39,6 +43,8 @@ do {
     case "check": exit(try await check(arguments) ? 0 : 1)
     case "run": try runInLedge(arguments)
     case "shots": try shots(arguments)
+    case "agent": try agent(arguments)
+    case "mcp": mcp(arguments)
     case "version", "--version": print(SessionProtocol.apiLevel)
     case "help", "--help", "-h": print(usage, terminator: "")
     default:
