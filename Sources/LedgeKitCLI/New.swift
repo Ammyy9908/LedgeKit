@@ -330,10 +330,16 @@ private struct Scaffold {
 
 /// A plain icon so the package builds and loads. Replace it with the add-on's own before submitting.
 private func drawPlaceholderIcon(to file: URL) throws {
+    guard let png = placeholderIcon().representation(using: .png, properties: [:]) else { throw CLIError("Couldn't save the icon.") }
+    try png.write(to: file)
+}
+
+/// The placeholder icon, drawn at 1024 pixels.
+func placeholderIcon() -> NSBitmapImageRep {
     let size = 1024
-    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8,
-                                     samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                                     bytesPerRow: 0, bitsPerPixel: 0) else { throw CLIError("Couldn't draw the icon.") }
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8,
+                               samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                               bytesPerRow: 0, bitsPerPixel: 0)!
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     let side = CGFloat(size)
@@ -346,6 +352,24 @@ private func drawPlaceholderIcon(to file: URL) throws {
         glyph.draw(in: CGRect(x: (side - w) / 2, y: (side - h) / 2, width: w, height: h))
     }
     NSGraphicsContext.restoreGraphicsState()
-    guard let png = rep.representation(using: .png, properties: [:]) else { throw CLIError("Couldn't save the icon.") }
-    try png.write(to: file)
+    return rep
+}
+
+/// Whether an icon is still the placeholder: both shrunk to 16 pixels, they differ by almost nothing. Small
+/// changes in how macOS draws the symbol don't hide it; any real icon does.
+func isPlaceholderIcon(_ icon: NSImageRep) -> Bool {
+    func tiny(_ image: NSImageRep) -> [UInt8] {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16, pixelsHigh: 16, bitsPerSample: 8,
+                                   samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                   bytesPerRow: 64, bitsPerPixel: 32)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        image.draw(in: CGRect(x: 0, y: 0, width: 16, height: 16))
+        NSGraphicsContext.restoreGraphicsState()
+        return Array(UnsafeBufferPointer(start: rep.bitmapData, count: 16 * 64))
+    }
+    let a = tiny(icon), b = tiny(placeholderIcon())
+    let difference = zip(a, b).reduce(0) { $0 + abs(Int($1.0) - Int($1.1)) }
+    return Double(difference) / Double(a.count) < 3
 }

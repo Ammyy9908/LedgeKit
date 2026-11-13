@@ -94,6 +94,9 @@ private func check(_ folder: URL, into report: inout Report) {
     if manifest.summary.hasPrefix("One line about") { report.warnings.append("addon.json: write the summary.") }
     if manifest.description.contains("Replace this") { report.warnings.append("addon.json: write the description.") }
     if manifest.author == "Your name" { report.warnings.append("addon.json: put your name in author.") }
+    if let category = manifest.category, !AddOnManifest.categories.contains(category) {
+        report.errors.append("addon.json: category must be one of \(AddOnManifest.categories.joined(separator: ", ")); it's \"\(category)\".")
+    }
 
     // LedgeKit by its published URL, so CI and everyone else build the same thing.
     if let package = text("Package.swift") {
@@ -122,6 +125,7 @@ private func check(_ folder: URL, into report: inout Report) {
             if rep.pixelsWide != rep.pixelsHigh { report.errors.append("Assets/Icon.png must be square; it's \(rep.pixelsWide)×\(rep.pixelsHigh).") }
             if rep.pixelsWide < 256 { report.warnings.append("Assets/Icon.png is \(rep.pixelsWide) pixels; use at least 256, ideally 1024.") }
             if rep.pixelsWide > 2048 { report.errors.append("Assets/Icon.png is \(rep.pixelsWide) pixels; Ledge takes at most 2048. Use 1024.") }
+            if isPlaceholderIcon(rep) { report.warnings.append("Assets/Icon.png is still the placeholder ledgekit drew. Draw the add-on's own.") }
         } else {
             report.errors.append("Assets/Icon.png isn't a PNG Ledge can read.")
         }
@@ -155,6 +159,10 @@ private func checkListing(_ folder: URL, into report: inout Report) {
             continue
         }
         if field == "description", value.hasPrefix("Describe what") { report.warnings.append("listing.json: write the description.") }
+        if field == "developer", value == "Your name" { report.warnings.append("listing.json: put your name in developer.") }
+        if field == "category", !AddOnManifest.categories.contains(value) {
+            report.errors.append("listing.json: category must be one of \(AddOnManifest.categories.joined(separator: ", ")).")
+        }
     }
     let feedback = (listing["feedbackURL"] as? String).flatMap(URL.init(string:))
     if feedback?.scheme != "https" || feedback?.host == nil {
