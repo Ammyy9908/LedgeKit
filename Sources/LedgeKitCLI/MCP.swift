@@ -42,7 +42,7 @@ private struct MCPServer {
         case "initialize":
             return ["protocolVersion": params["protocolVersion"] as? String ?? "2025-06-18",
                     "capabilities": ["tools": [:] as [String: Any]],
-                    "serverInfo": ["name": "ledgekit", "version": SessionProtocol.apiLevel],
+                    "serverInfo": ["name": "ledgekit", "version": SessionProtocol.release],
                     "instructions": "Tools for building a Ledge add-on in \(folder.path). Run ledgekit_doctor first, and after every change: ledgekit_test, ledgekit_check, then ledgekit_shots to look. Read ledgekit_docs for the rules."]
         case "ping":
             return [:]
@@ -80,7 +80,7 @@ private struct MCPServer {
     private func call(_ name: String, _ input: [String: Any]) throws -> [String: Any] {
         switch name {
         case "ledgekit_doctor":
-            var lines = ["ledgekit \(SessionProtocol.apiLevel) at \(tool)"]
+            var lines = ["ledgekit \(SessionProtocol.release) at \(tool)"]
             lines.append(run("swift", ["--version"]).text.split(separator: "\n").first.map(String.init) ?? "swift: not found")
             if let manifest = try? readManifest(in: folder) {
                 lines.append("Add-on: \(manifest.name) (\(manifest.id)) \(manifest.version), surfaces \((manifest.surfaces ?? []).joined(separator: ", ")), capabilities \(manifest.capabilities.isEmpty ? "none" : manifest.capabilities.joined(separator: ", ")), minAPI \(manifest.kit?.minAPI ?? "unset")")

@@ -4,7 +4,7 @@ import LedgeKit
 // ledgekit: the add-on developer's tool. Each command is a function in its own file; this one only chooses.
 
 let usage = """
-ledgekit \(SessionProtocol.apiLevel): build Ledge add-ons
+ledgekit \(SessionProtocol.release): build Ledge add-ons
 
   ledgekit new <id> [--name "Name"] [--page] [--widget] [--activity] [--into <folder>]
       Writes a working add-on in a new folder: package, tests, manifest, listing, README, changelog, icon.
@@ -53,7 +53,7 @@ do {
     case "agent": try agent(arguments)
     case "submit": try await submit(arguments)
     case "mcp": mcp(arguments)
-    case "version", "--version": print(SessionProtocol.apiLevel)
+    case "version", "--version": print(SessionProtocol.release)
     case "help", "--help", "-h": print(usage, terminator: "")
     default:
         fail("Unknown command \(command).\n\n" + usage)

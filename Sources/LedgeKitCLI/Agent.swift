@@ -73,7 +73,7 @@ func ledgekitPath() -> String {
 let brief = """
 # Building a Ledge add-on
 
-This folder is an add-on for Ledge, a macOS app that lives in the notch. It's written with LedgeKit \(SessionProtocol.apiLevel).
+This folder is an add-on for Ledge, a macOS app that lives in the notch. It's written with LedgeKit \(SessionProtocol.release).
 Read this before changing anything, and keep to it.
 
 ## What an add-on is

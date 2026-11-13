@@ -96,7 +96,7 @@ private struct Scaffold {
         let package = Package(
             name: "\(type)",
             platforms: [.macOS(.v14)],
-            dependencies: [.package(url: "https://github.com/Ammyy9908/LedgeKit.git", exact: "\(SessionProtocol.apiLevel)")],
+            dependencies: [.package(url: "https://github.com/Ammyy9908/LedgeKit.git", exact: "\(SessionProtocol.release)")],
             targets: [
                 // What the add-on knows and what it shows, testable without Ledge.
                 .target(name: "\(type)Core", dependencies: [.product(name: "LedgeKit", package: "LedgeKit")]),
