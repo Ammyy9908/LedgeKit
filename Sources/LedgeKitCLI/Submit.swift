@@ -35,13 +35,17 @@ func submit(_ given: [String]) async throws {
     let gh = (try? output("which", ["gh"])).flatMap { $0.isEmpty ? nil : $0 }
 
     if printOnly {
+        // Whether this is an update: known from the checkout when there is one.
+        let existing = repoPath.map { FileManager.default.fileExists(atPath: URL(fileURLWithPath: $0).appendingPathComponent("add-ons/\(manifest.id)/addon.json").path) }
+        let titleLine = existing.map { title(manifest, existing: $0) }
+            ?? "\(title(manifest, existing: false)), or \(title(manifest, existing: true)) if LedgeAddOns has it already"
         print("""
 
         Would copy into add-ons/\(manifest.id)/ on a branch \(branch) of \(repoPath ?? "your fork of \(upstream)"):
         \(files.map { "  \($0)" }.joined(separator: "\n"))
         then run scripts/validate.py there, commit, push, and open a pull request against \(upstream):main.
         \(gh == nil ? "\nThe GitHub CLI isn't installed (brew install gh, then gh auth login), so you'd open the pull request yourself from the link it prints.\n" : "")
-        Title: \(title(manifest, existing: false))
+        Title: \(titleLine)
 
         \(body)
         """)
