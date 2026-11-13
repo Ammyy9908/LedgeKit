@@ -167,3 +167,21 @@ private actor Seen {
                                                                      confirm: .init("Sure?", confirmTitle: "Yes"))])])
     #expect(throws: SurfaceValidationError.self) { try wrong.validate() }
 }
+
+@Test func aWidgetIsSmallUnlessItSaysSo() throws {
+    // Small sends exactly what a widget sent before sizes existed, so an older Ledge reads it the same.
+    let small = Widget("w", title: "W", symbol: "x", content: .spacer)
+    let json = String(decoding: try JSONEncoder().encode(small), as: UTF8.self)
+    #expect(!json.contains("size"))
+    let old = #"{"id":"w","title":"W","symbol":"x","content":{"spacer":{}}}"#
+    #expect(try JSONDecoder().decode(Widget.self, from: Data(old.utf8)).size == .small)
+}
+
+@Test(arguments: Widget.Size.allCases)
+func everyWidgetSizeRoundTrips(size: Widget.Size) throws {
+    let widget = Widget("w", title: "W", symbol: "x", size: size, content: .text("Hi", style: nil))
+    let back = try JSONDecoder().decode(Widget.self, from: try JSONEncoder().encode(widget))
+    #expect(back == widget)
+    #expect(back.size == size)
+    try back.validate()
+}

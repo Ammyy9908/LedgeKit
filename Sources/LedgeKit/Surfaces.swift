@@ -487,11 +487,33 @@ public struct Widget: Codable, Sendable, Equatable {
     /// An SF Symbol for the Widgets page's icon row.
     public var symbol: String
     public var content: WidgetNode
-    public init(_ id: String, title: String, symbol: String, content: WidgetNode) {
+    /// How tall the Widgets page is while this widget is open. Small, the default, is the size every widget had before
+    /// LedgeKit 0.15.0, and a Ledge older than that draws every widget small. Needs 0.15.0.
+    public var size: Size {
+        get { storedSize ?? .small }
+        set { storedSize = newValue == .small ? nil : newValue }
+    }
+    /// Nil for small, so a small widget sends exactly what it did before sizes existed.
+    private var storedSize: Size?
+
+    public init(_ id: String, title: String, symbol: String, size: Size = .small, content: WidgetNode) {
         self.id = id
         self.title = title
         self.symbol = symbol
         self.content = content
+        self.size = size
+    }
+
+    /// The room under the widget's title, at the notch's Regular width (Compact is 60 points narrower, Large 80
+    /// wider): small 348 × 78 points, medium 348 × 138, large 348 × 198. Content taller than that is cut off at the
+    /// bottom.
+    public enum Size: String, Codable, Sendable, CaseIterable {
+        case small, medium, large
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, symbol, content
+        case storedSize = "size"
     }
 }
 

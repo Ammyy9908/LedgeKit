@@ -174,7 +174,7 @@ private struct Scaffold {
         if widget {
             parts.append("""
 
-                /// The widget on the open notch's Widgets page.
+                /// The widget on the open notch's Widgets page. Pass `size: .medium` or `.large` for more room.
                 public func widget() -> Widget {
                     Widget("main", title: "\(name)", symbol: "sparkles", content: .vstack(spacing: 8, children: [
                         .text("\\(count)", style: .title),
