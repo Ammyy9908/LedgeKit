@@ -1,0 +1,33 @@
+name: API reference
+# Builds LedgeKit's API reference with DocC and publishes it to GitHub Pages, for every release tag.
+# Needs Pages turned on with "GitHub Actions" as the source (Settings, Pages).
+on:
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the reference
+        run: Scripts/docs.sh .build/docs LedgeKit
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .build/docs
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

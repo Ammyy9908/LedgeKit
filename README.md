@@ -280,20 +280,81 @@ Validation throws ManifestValidationError with an invalid field, unsupported
 protocol, or unsupported capability. New strict checks reject previously accepted
 malformed versions, duplicate capabilities and blank author/name values.
 
-## Validate and build
+## The ledgekit tool
 
-From the LedgeKit repository root:
+Build it once from this repository and put it on your PATH:
 
 ```sh
-swift run ledgekit validate /path/to/your/addon.json
-swift build
-swift test
+swift build -c release
+export PATH="$(swift build -c release --show-bin-path):$PATH"
 ```
 
-CLI exit codes: 0 valid, 1 invalid/unreadable, 2 incorrect usage. The CLI checks
-metadata only. The host additionally validates executable and image files.
-It does not certify trust, signatures, compatibility with arbitrary capabilities,
-or successful installation.
+Then, anywhere:
+
+```sh
+ledgekit new battery-cycles --widget --page   # a working add-on: package, tests, manifest, listing, icon
+cd battery-cycles
+swift test                                    # includes every surface checked against Ledge's limits
+ledgekit build                                # .build/addons/<Name>.ledgeaddon, ad-hoc signed
+ledgekit validate                             # what LedgeAddOns checks; --submit makes to-dos errors
+ledgekit validate addon.json                  # the manifest alone
+ledgekit check                                # runs it with no Ledge and reports what Ledge would make of it
+ledgekit check --script steps.json --report report.json
+```
+
+`check` starts the built add-on with `LedgeKitHost`'s runtime, the one Ledge uses, reads every surface it sends
+with the reader Ledge uses, and answers its calls to Ledge as Ledge would: allowed, or refused for a missing
+capability or outside the moments Ledge allows. It names surfaces Ledge would refuse, ones declared and never sent,
+and anything newer than `kit.minAPI`, and exits 1 if Ledge wouldn't run it as it is. A script is a JSON list of
+steps: `{"wait": 1}`, `{"visible": ["notch-page"]}`, `{"press": "new", "screen": "list"}`,
+`{"edit": "body", "text": "…"}`, `{"end": "body", "text": "…"}`, `{"toggle": "id", "on": "settings-page", "to": true}`,
+`{"pick": "id", "value": "x"}` and `{"change": "id", "value": 0.5}`. Steps act on the notch page unless `on` says
+otherwise.
+
+In your own Ledge, with **Developer Mode** turned on (Settings, Add-on Store, ⋯, Developer Mode; it asks first and
+turns off when Ledge quits):
+
+```sh
+ledgekit run                       # installs it without the trust prompt and says whether it started
+ledgekit shots --out shots         # installs it, then Ledge draws each of its surfaces into PNGs
+```
+
+`shots` draws the notch page's current screen, each widget, the settings page, the lock screen pill and the menu bar
+tiles exactly as Ledge draws them; live activities aren't drawn yet. Ledge listens on a socket in a folder only your
+account can open, and only while developer mode is on.
+
+## Submitting
+
+```sh
+ledgekit submit --print            # the checks, then what it would do and the pull request text
+ledgekit submit                    # with the GitHub CLI: fork, branch, copy, validate, commit, push, open the PR
+ledgekit submit --repo ~/LedgeAddOns   # or work in a LedgeAddOns checkout you already have
+```
+
+It runs `validate --submit`, the tests and `check` first, and stops at the first that fails. Then, on a branch
+`add-<id>-<version>` from LedgeAddOns' `main`, it copies only what the Store takes into `add-ons/<id>/`, runs the
+repository's `scripts/validate.py`, commits and pushes, and opens the pull request with the template filled in
+from the manifest and the check. An update must raise `version`. Without the GitHub CLI it prints the link to open
+the pull request yourself, with the description saved beside the checkout.
+
+## With a coding agent
+
+`ledgekit new` writes `AGENTS.md` (the brief: what an add-on is, the loop to run after every change, the rules),
+`CLAUDE.md` and Cursor rules pointing to it, and `.mcp.json` wiring for `ledgekit mcp`, a Model Context Protocol
+server whose tools are the loop: doctor, new, test, build, check (its JSON report), run, shots (the pictures
+themselves), validate and docs. `ledgekit agent` writes them into an existing add-on. They stay on your Mac: the
+scaffold's `.gitignore` lists them and LedgeAddOns refuses them. For Codex, register the server once:
+`codex mcp add ledgekit -- $(which ledgekit) mcp`.
+
+`LedgeKitHost` is also a library of its own: the runtime that runs an add-on, its session records and the package
+reader, shared by Ledge and the checker.
+
+`new` splits an add-on into `<Name>Core`, which holds its state and builds what Ledge draws, and the executable,
+which only runs the session, so the surfaces are testable without Ledge. `validate` exits 0 when the folder is
+valid, 1 when LedgeAddOns would refuse it. The host still checks the package's files and asks the user to trust it;
+nothing here certifies an add-on.
+
+To work on LedgeKit itself: `swift build` and `swift test` in this repository.
 
 ## Support and roadmap
 
