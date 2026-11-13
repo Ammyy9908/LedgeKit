@@ -1,21 +1,41 @@
 import Foundation
 import LedgeKit
 
-// Validation is deliberately metadata-only. Host installation validates package files.
-let arguments = Array(CommandLine.arguments.dropFirst())
-guard arguments.count == 2, arguments[0] == "validate" else {
-    FileHandle.standardError.write(Data("Usage: ledgekit validate <addon.json>\n".utf8))
-    exit(2)
+// ledgekit: the add-on developer's tool. Each command is a function in its own file; this one only chooses.
+
+let usage = """
+ledgekit \(SessionProtocol.apiLevel): build Ledge add-ons
+
+  ledgekit new <id> [--name "Name"] [--page] [--widget] [--activity] [--into <folder>]
+      Writes a working add-on in a new folder: package, tests, manifest, listing, README, changelog, icon.
+  ledgekit build [<folder>]
+      Builds a .ledgeaddon you can load in Ledge (Settings, Add-on Store, Load Add-on…), ad-hoc signed.
+  ledgekit validate [<folder> | <addon.json>]
+      Checks an add-on folder the way LedgeAddOns does, or just a manifest.
+  ledgekit version
+      The LedgeKit this tool belongs to.
+
+"""
+
+var arguments = Array(CommandLine.arguments.dropFirst())
+guard let command = arguments.first else {
+    print(usage, terminator: "")
+    exit(0)
 }
+arguments.removeFirst()
+
 do {
-    let data = try Data(contentsOf: URL(fileURLWithPath: arguments[1]))
-    let manifest = try JSONDecoder().decode(AddOnManifest.self, from: data)
-    try manifest.validate()
-    print("Valid manifest: \(manifest.id) \(manifest.version) (protocol \(manifest.protocolVersion))")
-} catch let error as ManifestValidationError {
-    FileHandle.standardError.write(Data((error.localizedDescription + "\n").utf8))
-    exit(1)
+    switch command {
+    case "new": try newAddOn(arguments)
+    case "build": try build(arguments)
+    case "validate": exit(try validate(arguments) ? 0 : 1)
+    case "version", "--version": print(SessionProtocol.apiLevel)
+    case "help", "--help", "-h": print(usage, terminator: "")
+    default:
+        fail("Unknown command \(command).\n\n" + usage)
+    }
+} catch let error as CLIError {
+    fail(error.message)
 } catch {
-    FileHandle.standardError.write(Data("Cannot read or decode manifest JSON.\n".utf8))
-    exit(1)
+    fail(String(describing: error))
 }

@@ -280,20 +280,32 @@ Validation throws ManifestValidationError with an invalid field, unsupported
 protocol, or unsupported capability. New strict checks reject previously accepted
 malformed versions, duplicate capabilities and blank author/name values.
 
-## Validate and build
+## The ledgekit tool
 
-From the LedgeKit repository root:
+Build it once from this repository and put it on your PATH:
 
 ```sh
-swift run ledgekit validate /path/to/your/addon.json
-swift build
-swift test
+swift build -c release
+export PATH="$(swift build -c release --show-bin-path):$PATH"
 ```
 
-CLI exit codes: 0 valid, 1 invalid/unreadable, 2 incorrect usage. The CLI checks
-metadata only. The host additionally validates executable and image files.
-It does not certify trust, signatures, compatibility with arbitrary capabilities,
-or successful installation.
+Then, anywhere:
+
+```sh
+ledgekit new battery-cycles --widget --page   # a working add-on: package, tests, manifest, listing, icon
+cd battery-cycles
+swift test                                    # includes every surface checked against Ledge's limits
+ledgekit build                                # .build/addons/<Name>.ledgeaddon, ad-hoc signed
+ledgekit validate                             # what LedgeAddOns checks; --submit makes to-dos errors
+ledgekit validate addon.json                  # the manifest alone
+```
+
+`new` splits an add-on into `<Name>Core`, which holds its state and builds what Ledge draws, and the executable,
+which only runs the session, so the surfaces are testable without Ledge. `validate` exits 0 when the folder is
+valid, 1 when LedgeAddOns would refuse it. The host still checks the package's files and asks the user to trust it;
+nothing here certifies an add-on.
+
+To work on LedgeKit itself: `swift build` and `swift test` in this repository.
 
 ## Support and roadmap
 
