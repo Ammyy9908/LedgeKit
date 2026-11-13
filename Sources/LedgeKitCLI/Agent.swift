@@ -88,9 +88,10 @@ Read this before changing anything, and keep to it.
 
 ## What Ledge gives each surface
 
-- **Widget**: the Widgets page shows one widget at a time, under a title strip, in about **348 × 78 points** at the
-  default notch width (288 at Compact, 428 at Large). Plan for two or three short lines; anything taller is cut off at
-  the bottom. A row with a `spacer` in it spans the full width, so the spacer pushes what follows to the right edge.
+- **Widget**: the Widgets page shows one widget at a time, under a title strip. Its `size` sets the room, at the
+  default notch width (60 points narrower at Compact, 80 wider at Large): `.small` (the default) **348 × 78 points**,
+  two or three short lines; `.medium` **348 × 138**; `.large` **348 × 198**. Pick the smallest that fits; anything
+  taller is cut off at the bottom. Medium and large need `kit.minAPI` 0.15.0. A row with a `spacer` in it spans the full width, so the spacer pushes what follows to the right edge.
 - **Notch page**: 348 points wide by default, and 122, 202 or 282 points tall for `small`, `medium` and `large`.
   On a display with a camera notch, its header sits either side of the camera: about 39 points a side at Compact,
   69 at Regular. Keep titles short; Ledge truncates them rather than put them under the camera.
