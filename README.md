@@ -323,6 +323,20 @@ ledgekit shots --out shots         # installs it, then Ledge draws each of its s
 tiles exactly as Ledge draws them; live activities aren't drawn yet. Ledge listens on a socket in a folder only your
 account can open, and only while developer mode is on.
 
+## Submitting
+
+```sh
+ledgekit submit --print            # the checks, then what it would do and the pull request text
+ledgekit submit                    # with the GitHub CLI: fork, branch, copy, validate, commit, push, open the PR
+ledgekit submit --repo ~/LedgeAddOns   # or work in a LedgeAddOns checkout you already have
+```
+
+It runs `validate --submit`, the tests and `check` first, and stops at the first that fails. Then, on a branch
+`add-<id>-<version>` from LedgeAddOns' `main`, it copies only what the Store takes into `add-ons/<id>/`, runs the
+repository's `scripts/validate.py`, commits and pushes, and opens the pull request with the template filled in
+from the manifest and the check. An update must raise `version`. Without the GitHub CLI it prints the link to open
+the pull request yourself, with the description saved beside the checkout.
+
 ## With a coding agent
 
 `ledgekit new` writes `AGENTS.md` (the brief: what an add-on is, the loop to run after every change, the rules),
