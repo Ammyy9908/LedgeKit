@@ -139,3 +139,31 @@ private actor Seen {
     #expect(throws: (any Error).self) { try MenuBarTile.validate((0..<3).map { MenuBarTile("t\($0)", symbol: "x", title: "T") }) }
     #expect(throws: (any Error).self) { try MenuBarTile.validate([MenuBarTile("t", symbol: "x", title: String(repeating: "x", count: 41))]) }
 }
+
+@Test func activityKindsAndSpokenValuesRoundTripAndAreChecked() throws {
+    let timer = LiveActivity("podcast", symbol: "headphones", text: "4:59", importance: .attention, kind: .nowPlaying,
+                             accessibilityValue: "4 minutes 59 seconds left")
+    let decoded = try JSONDecoder().decode(LiveActivity.self, from: JSONEncoder().encode(timer))
+    #expect(decoded == timer)
+    // An activity from before 0.13 has neither field.
+    let old = try JSONDecoder().decode(LiveActivity.self, from: Data(#"{"id":"a","symbol":"timer","text":"1:00","importance":"normal"}"#.utf8))
+    #expect(old.kind == nil && old.accessibilityValue == nil)
+    #expect(throws: SurfaceValidationError.self) {
+        try LiveActivity.validate([LiveActivity("a", symbol: "timer", text: "1:00", accessibilityValue: String(repeating: "x", count: 121))])
+    }
+}
+
+@Test func settingsButtonsCanAskFirstAndPagesHaveKeywords() throws {
+    let page = SettingsPage([SettingsSection("notes", rows: [
+        .button("clear", "Delete all notes", destructive: true,
+                confirm: .init("Delete all notes?", message: "They go to the Trash.", confirmTitle: "Delete")),
+    ])], keywords: ["markdown", "writing"])
+    try page.validate()
+    #expect(try JSONDecoder().decode(SettingsPage.self, from: JSONEncoder().encode(page)) == page)
+    // A page from before 0.13 has neither.
+    let old = try JSONDecoder().decode(SettingsPage.self, from: Data(#"{"sections":[]}"#.utf8))
+    #expect(old.keywords == nil)
+    let wrong = SettingsPage([SettingsSection("s", rows: [SettingsRow("t", title: "On", control: .toggle(isOn: true),
+                                                                     confirm: .init("Sure?", confirmTitle: "Yes"))])])
+    #expect(throws: SurfaceValidationError.self) { try wrong.validate() }
+}

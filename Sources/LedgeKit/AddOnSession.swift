@@ -25,6 +25,9 @@ public struct AddOnHandlers: Sendable {
     /// Ledge's environment changed: light or dark, the accent colour, a screen with a notch. The same value
     /// `LedgeHost.environment()` returns. Runs in order with events.
     public var onEnvironmentChange: @Sendable (HostEnvironment) async -> Void = { _ in }
+    /// Which of the add-on's surfaces are on screen changed: its notch page opened, the Widgets page closed, and so
+    /// on. Refresh what's seen while it's seen, and stop when nothing is. Runs in order with events. Needs 0.13.0.
+    public var onVisibilityChange: @Sendable (SurfaceVisibility) async -> Void = { _ in }
     /// Ledge asks a player action's state for a song, or the user pressed it. Return the state after it, or nil
     /// when it isn't known. Requests run side by side, like other methods. Throw `AddOnError` to say why it failed.
     public var onPlayerAction: @Sendable (PlayerActionRequest) async throws -> Bool? = { _ in nil }
@@ -130,6 +133,13 @@ public enum AddOnSession {
         update(topic: Surface.activitiesTopic, payload: payload)
     }
 
+    /// Shows the add-on's page in the open notch, or takes it down with nil. Each send replaces the screen; see
+    /// `PageScreen` for moving between screens. Declare `notch-page` in the manifest. Needs LedgeKit 0.12.0.
+    public static func show(notchPage: NotchPage?) {
+        guard let payload = try? JSONValue(encoding: notchPage) else { return }
+        update(topic: Surface.notchPageTopic, payload: payload)
+    }
+
     /// Shows the add-on's player menu and Playing Next, or removes them with nil. Declare `player` in the manifest.
     public static func show(player: PlayerExtension?) {
         guard let payload = try? JSONValue(encoding: player) else { return }
@@ -231,6 +241,13 @@ public enum AddOnSession {
                         continue
                     }
                     await handlers.onEnvironmentChange(environment)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
+                case SessionProtocol.Method.visibilityChanged:
+                    guard active, let visibility = try? params.decode(SurfaceVisibility.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the visibility."))
+                        continue
+                    }
+                    await handlers.onVisibilityChange(visibility)
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case Surface.eventMethod:
                     // Events run in order, before anything sent after them.

@@ -192,6 +192,50 @@ handlers.onEvent = { event in
   characters, value up to 20), shown under the clock only while the Mac is locked; up to two menu bar tiles, as rows
   under Ledge's own in its menu bar panel.
 
+## A page in the notch (0.12.0)
+
+```swift
+let list = PageScreen("list", title: "Notes",
+    actions: [PageAction("new", symbol: "square.and.pencil", label: "New note")],
+    content: .list(id: "notes", rows: [ListRow("n1", title: "Launch day", subtitle: "Beta 2 goes out", detail: "12:41 PM")]))
+AddOnSession.show(notchPage: NotchPage(title: "Notes", symbol: "note.text", size: .medium, screen: list))  // nil takes it down
+
+handlers.onEvent = { event in
+    guard event.surface == Surface.notchPage else { return }
+    if event.control == "notes", let id = event.item { openNote(id) }          // a row: the list's id, then the row's
+    if event.control == PageScreen.backControl { showList() }
+    if event.control == "body", case .ended(let markdown) = event.action { save(markdown) }
+}
+```
+
+- Declare `"notch-page"` in `surfaces`. One page per add-on, with its icon in the pill under the open notch, after
+  Ledge's Shelf, Clipboard and Widgets.
+- The page shows one screen at a time. Send the next screen to move to it: Ledge slides forward when its `depth` is
+  greater, back when it's less. A header can have a back button, a title or caption, and up to three buttons.
+- Screens are made of a widget's parts plus `.list`, `.empty` and `.editor`. The editor's text is Markdown (bold,
+  italic, headings, lists and checklists); it sends `.edited` as someone types and `.ended` when they leave it, and
+  Ledge keeps their text if the screen is sent again meanwhile.
+- Limits: 200 parts per screen, 100 rows per list, 3 header buttons, one editor of up to 50,000 characters.
+
+## Good add-ons (0.13.0)
+
+```swift
+handlers.onVisibilityChange = { visibility in            // which of your surfaces are on screen
+    if visibility.isVisible(Surface.notchPage) { await notes.reload() }
+}
+let folder = try await LedgeHost.dataFolder()            // your own files, kept through updates
+try await LedgeHost.showPage()                           // just after a press, or for an .attention activity
+try await LedgeHost.openSettings()                       // just after a press, for a "Set up" button
+try await LedgeHost.holdOpen(true)                       // while something the user watches runs
+```
+
+- `showPage` and `holdOpen` need the `notch-control` capability. Ledge refuses `showPage` from a timer.
+- `LiveActivity` gains `kind` (`.nowPlaying`, `.download`, `.recording`), which steps aside for Ledge's own of the
+  same kind (placement `duplicatesBuiltIn`), and `accessibilityValue`. `.attention` sits above `.high`. A `.high`
+  or `.attention` activity that says the same thing for half an hour is placed `stale` until it changes.
+- A settings button can ask first: `.button(id, title, destructive: true, confirm: .init(...))`. A page can carry
+  `keywords` for Ledge's Settings search.
+
 ## Implement a worker (protocol 1)
 
 ```swift
