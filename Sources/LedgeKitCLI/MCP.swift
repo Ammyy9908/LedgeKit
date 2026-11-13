@@ -70,7 +70,8 @@ private struct MCPServer {
             ["name": "ledgekit_check", "description": "Run the add-on with no Ledge, the way Ledge would, and return the JSON report: surfaces sent and refused, calls to Ledge allowed or refused, problems and warnings. Not done while problems isn't empty.",
              "inputSchema": schema(["script": ["type": "array", "description": "Steps: {\"wait\":1}, {\"visible\":[\"notch-page\"]}, {\"press\":\"id\",\"on\":\"notch-page\",\"screen\":\"list\",\"item\":\"row\"}, {\"edit\":\"body\",\"text\":\"…\"}, {\"end\":\"body\",\"text\":\"…\"}, {\"toggle\":\"id\",\"on\":\"settings-page\",\"to\":true}, {\"pick\":\"id\",\"value\":\"x\"}, {\"change\":\"id\",\"value\":0.5}", "items": ["type": "object"]]])],
             ["name": "ledgekit_run", "description": "Install the build in the user's Ledge and say whether it started. Needs Developer Mode on in Ledge.", "inputSchema": schema()],
-            ["name": "ledgekit_shots", "description": "Install the build in the user's Ledge, have Ledge draw each surface, and return the pictures. Look at them. Needs Developer Mode on in Ledge.", "inputSchema": schema()],
+            ["name": "ledgekit_shots", "description": "Install the build in the user's Ledge, have Ledge draw each surface, and return the pictures. Look at them, the narrowest first: the notch page and widgets at Compact and Regular width beside a camera, and every live activity shape. Needs Developer Mode on in Ledge.",
+             "inputSchema": schema(["all": ["type": "boolean", "description": "Also return the Large width and the pill display, which are drawn but left out by default"]])],
             ["name": "ledgekit_validate", "description": "Check the folder the way LedgeAddOns does. submit: true makes the to-dos errors, as before a pull request.",
              "inputSchema": schema(["submit": ["type": "boolean"]])],
             ["name": "ledgekit_docs", "description": "The rules and the loop for building a Ledge add-on, and where the full docs are.", "inputSchema": schema()],
@@ -126,7 +127,15 @@ private struct MCPServer {
             try? FileManager.default.removeItem(at: out)
             let outcome = run(tool, ["shots", "--out", out.path])
             var content: [[String: Any]] = [["type": "text", "text": outcome.text]]
-            let files = ((try? FileManager.default.contentsOfDirectory(atPath: out.path)) ?? []).filter { $0.hasSuffix(".png") }.sorted()
+            let drawn = ((try? FileManager.default.contentsOfDirectory(atPath: out.path)) ?? []).filter { $0.hasSuffix(".png") }.sorted()
+            // By default the pictures that find the most: the narrowest notch widths beside a camera, where a page's
+            // header is tightest, and every activity shape. The rest are named, so the agent can ask for them.
+            let everything = input["all"] as? Bool == true
+            let files = everything ? drawn : drawn.filter {
+                !$0.contains("@") || $0.hasPrefix("activity-") || $0.contains("@notch-compact") || $0.contains("@notch-regular")
+            }
+            let left = drawn.filter { !files.contains($0) }
+            if !left.isEmpty { content.append(["type": "text", "text": "Also drawn, in \(out.path): \(left.joined(separator: ", ")). Pass all: true to see them."]) }
             for file in files {
                 guard let data = FileManager.default.contents(atPath: out.appendingPathComponent(file).path) else { continue }
                 content.append(["type": "text", "text": file])
