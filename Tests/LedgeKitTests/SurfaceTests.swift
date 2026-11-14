@@ -185,3 +185,17 @@ func everyWidgetSizeRoundTrips(size: Widget.Size) throws {
     #expect(back.size == size)
     try back.validate()
 }
+
+@Test func aWidgetWithoutCompactContentSendsWhatItDidBefore() throws {
+    let plain = Widget("w", title: "W", symbol: "x", content: .spacer)
+    #expect(!String(decoding: try JSONEncoder().encode(plain), as: UTF8.self).contains("compactContent"))
+    let paired = Widget("w", title: "W", symbol: "x", content: .text("Long", style: nil), compactContent: .text("Short", style: nil))
+    let back = try JSONDecoder().decode(Widget.self, from: JSONEncoder().encode(paired))
+    #expect(back == paired)
+    try back.validate()
+}
+
+@Test func compactContentIsCheckedLikeContent() {
+    let deep = (0..<10).reduce(WidgetNode.spacer) { node, _ in .vstack(spacing: nil, children: [node]) }
+    #expect(throws: (any Error).self) { try Widget("w", title: "W", symbol: "x", content: .spacer, compactContent: deep).validate() }
+}

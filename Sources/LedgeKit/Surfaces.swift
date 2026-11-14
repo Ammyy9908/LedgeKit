@@ -495,12 +495,16 @@ public struct Widget: Codable, Sendable, Equatable {
     }
     /// Nil for small, so a small widget sends exactly what it did before sizes existed.
     private var storedSize: Size?
+    /// The widget laid out for half the room, beside another widget the person pinned it with: about 168 points wide at
+    /// Regular width, 208 at Large, as tall as `size`. Without it the widget can't be paired. Needs 0.17.0.
+    public var compactContent: WidgetNode?
 
-    public init(_ id: String, title: String, symbol: String, size: Size = .small, content: WidgetNode) {
+    public init(_ id: String, title: String, symbol: String, size: Size = .small, content: WidgetNode, compactContent: WidgetNode? = nil) {
         self.id = id
         self.title = title
         self.symbol = symbol
         self.content = content
+        self.compactContent = compactContent
         self.size = size
     }
 
@@ -512,7 +516,7 @@ public struct Widget: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, symbol, content
+        case id, title, symbol, content, compactContent
         case storedSize = "size"
     }
 }
@@ -783,6 +787,12 @@ extension Widget {
             }
         }
         try walk(content, depth: 1)
+        // The half-width layout counts on its own, against the same limits.
+        if let compactContent {
+            ids = []
+            count = 0
+            try walk(compactContent, depth: 1)
+        }
     }
 }
 

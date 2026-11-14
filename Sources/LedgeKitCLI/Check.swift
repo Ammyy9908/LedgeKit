@@ -413,6 +413,7 @@ private final class CheckReport: @unchecked Sendable {
         case .lockScreenRow?, .menuBarTiles?: needs("0.11.0", "Lock screen rows and menu bar tiles")
         case .widgets(let list)?:
             if list.contains(where: { $0.size != .small }) { needs("0.15.0", "A medium or large widget") }
+            if list.contains(where: { $0.compactContent != nil }) { needs("0.17.0", "A widget's compactContent") }
         case .tools?: needs("0.16.0", "Tools for AI apps")
         default: break
         }
