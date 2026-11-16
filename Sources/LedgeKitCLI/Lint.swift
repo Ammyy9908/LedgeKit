@@ -52,6 +52,9 @@ private func lintRules() -> [LintRule] { [
              "LedgeHost.set stores plain JSON on disk. Keep secrets in the Keychain."),
     LintRule("logs-content", .warning, #"AddOnSession\.log\s*\(.*\\\(\s*[\w.]*\b(text|body|content|note|title|song|track|artist|email|token|password)\b"#,
              "This logs what the add-on read. Log that something failed, not its contents."),
+    LintRule("terminal-input-kept", .warning, #"(AddOnSession\.log|LedgeHost\.set|UserDefaults|\.write\s*\(\s*to:|URLSession)"#,
+             "A file that handles onTerminalInput also logs, stores or sends something. What the person types is theirs: write it to the program and nowhere else.",
+             file: { $0.contains("onTerminalInput") }),
     LintRule("home-path", .warning, #""/Users/[^"]*""#,
              "A path in someone's home folder won't exist on another Mac. Use LedgeHost.dataFolder() or FileManager."),
 ] }

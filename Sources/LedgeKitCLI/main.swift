@@ -6,7 +6,7 @@ import LedgeKit
 let usage = """
 ledgekit \(SessionProtocol.release): build Ledge add-ons
 
-  ledgekit new <id> [--name "Name"] [--page] [--widget] [--activity] [--into <folder>]
+  ledgekit new <id> [--name "Name"] [--page] [--widget] [--activity] [--terminal] [--into <folder>]
       Writes a working add-on in a new folder: package, tests, manifest, listing, README, changelog, icon.
   ledgekit build [<folder>]
       Builds a .ledgeaddon you can load in Ledge (Settings, Add-on Store, Load Add-on…), ad-hoc signed.
@@ -25,6 +25,7 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
         {"wait": 1}  {"visible": ["widget"]}  {"press": "refresh", "on": "widget"}  {"edit": "body", "text": "…"}
         {"end": "body", "text": "…"}  {"toggle": "sounds", "to": true}  {"pick": "units", "value": "c"}  {"change": "volume", "value": 0.5}
         {"tool": "add_note", "arguments": {"text": "…"}}: an AI app's call, arguments checked as Ledge checks them
+        {"type": "ls\\n"}: typed into the add-on's terminal (a newline is Return); the report's terminal.output has the screen
       With no script it waits, shows every declared surface, waits, then hides them.
       --deny turns capabilities off, as a person can in Ledge: calls that need them are refused, which isn't a
       problem, but the add-on must keep running and say what it can't do. The report keeps the last version of each

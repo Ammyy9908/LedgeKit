@@ -217,6 +217,27 @@ handlers.onEvent = { event in
   Ledge keeps their text if the screen is sent again meanwhile.
 - Limits: 200 parts per screen, 100 rows per list, 3 header buttons, one editor of up to 50,000 characters.
 
+## A terminal in the notch (0.18.0)
+
+```swift
+let terminal = AddOnTerminal()
+var handlers = AddOnHandlers()
+terminal.connect(&handlers)        // the person's login shell, started on Ledge's first size
+exit(await AddOnSession.run(id: "terminal", handlers: handlers))
+```
+
+- Declare `"terminal"` in both `surfaces` and `capabilities`: the person approves an add-on that runs programs as
+  them before it starts. Ledge never starts a program itself; it draws the screen and sends what's typed.
+- What the person types arrives in `onTerminalInput`, in order. Write it to the program and nowhere else: never log,
+  store or send it. `ledgekit lint` warns about a file that handles it and also logs or stores something.
+- `onTerminalResize` brings the size in characters, first when the page first shows. `AddOnSession.terminal(output:)`
+  sends what the program wrote, in order, split into 32 KB pieces; `show(terminal:)` sends the folder Ledge shows and
+  opens in the person's terminal app, and whether the program is still running.
+- `connect(_:start:)` takes a `start` to run something other than the login shell, or somewhere other than home.
+  It starts the program again on the next key after it ends, and hangs it up when the add-on is turned off.
+- Check it without Ledge: `{"type": "ls\n"}` script steps type into it, and the report's `terminal.output` is the
+  screen as text.
+
 ## Good add-ons (0.13.0)
 
 ```swift

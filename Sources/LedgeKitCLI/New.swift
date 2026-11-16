@@ -13,10 +13,11 @@ func newAddOn(_ given: [String]) throws {
     let into = option("--into", in: &arguments)
     let page = flag("--page", in: &arguments)
     let activity = flag("--activity", in: &arguments)
+    let terminal = flag("--terminal", in: &arguments)
     // A widget unless something else was asked for, so a bare `ledgekit new` still shows something.
-    let widget = flag("--widget", in: &arguments) || (!page && !activity)
+    let widget = flag("--widget", in: &arguments) || (!page && !activity && !terminal)
     guard arguments.count == 1, let id = arguments.first else {
-        throw CLIError("Usage: ledgekit new <id> [--name \"Name\"] [--page] [--widget] [--activity] [--into <folder>]")
+        throw CLIError("Usage: ledgekit new <id> [--name \"Name\"] [--page] [--widget] [--activity] [--terminal] [--into <folder>]")
     }
     guard !id.isEmpty, id.count <= 64, id.first?.isLetter == true,
           id.allSatisfy({ $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-") }), !id.hasSuffix("-") else {
@@ -32,7 +33,8 @@ func newAddOn(_ given: [String]) throws {
     }
     let author = (try? output("git", ["config", "user.name"])).flatMap { $0.isEmpty ? nil : $0 } ?? "Your name"
 
-    let scaffold = Scaffold(id: id, type: type, name: name, author: author, page: page, widget: widget, activity: activity)
+    let scaffold = Scaffold(id: id, type: type, name: name, author: author, page: page, widget: widget, activity: activity,
+                            terminal: terminal)
     for (path, text) in scaffold.files {
         let file = folder.appendingPathComponent(path)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -68,11 +70,15 @@ func newAddOn(_ given: [String]) throws {
 /// The files of a new add-on, by path.
 private struct Scaffold {
     let id, type, name, author: String
-    let page, widget, activity: Bool
+    let page, widget, activity, terminal: Bool
 
     var surfaces: [String] {
         ["settings-page"] + (widget ? ["widget"] : []) + (page ? ["notch-page"] : []) + (activity ? ["activity"] : [])
+            + (terminal ? [Surface.terminal] : [])
     }
+
+    /// A terminal runs programs as the person, which they approve.
+    var capabilities: [String] { terminal ? [Surface.terminalCapability] : [] }
 
     var files: [(String, String)] {
         [
@@ -114,7 +120,7 @@ private struct Scaffold {
             "id": id, "version": "0.1.0", "protocolVersion": SessionProtocol.version, "name": name,
             "summary": "One line about what \(name) does",
             "description": "What \(name) does, what it shows and where, and what it needs. Replace this.",
-            "author": author, "capabilities": [String](), "surfaces": surfaces, "executable": type,
+            "author": author, "capabilities": capabilities, "surfaces": surfaces, "executable": type,
             "icon": "Assets/Icon.png", "kit": ["minAPI": SessionProtocol.apiLevel], "category": "Productivity",
         ]
         let data = try! JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
@@ -286,9 +292,20 @@ private struct Scaffold {
         var handlers = AddOnHandlers()
         handlers.activate = { await addOn.start() }
         handlers.onEvent = { event in await addOn.handle(event) }
-        handlers.onVisibilityChange = { visibility in await addOn.visibilityChanged(visibility) }
+        handlers.onVisibilityChange = { visibility in await addOn.visibilityChanged(visibility) }\(terminalWiring)
         exit(await AddOnSession.run(id: "\(id)", handlers: handlers))
 
+        """
+    }
+
+    /// The terminal page: the person's login shell, started on Ledge's first size. What they type goes only to it.
+    var terminalWiring: String {
+        guard terminal else { return "" }
+        return """
+
+        // The terminal page runs the person's login shell. Pass `start:` to run something else, or in another folder.
+        let terminal = AddOnTerminal()
+        terminal.connect(&handlers)
         """
     }
 
