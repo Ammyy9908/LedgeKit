@@ -106,6 +106,10 @@ Read this before changing anything, and keep to it.
   `notch-control` (`showPage`, `openSettings`, `holdOpen`), and the account ones Ledge brokers: `spotify-library`,
   `apple-music-queue`, `apple-music-controls`, `notification-banners`, and `terminal` (with the terminal surface).
   Settings, the environment and `dataFolder` need none.
+- **Picker** (0.19.0): a floating panel on a shortcut, searching the add-on's items (emoji, symbols, snippets).
+  Send `AddOnSession.show(picker:)` with sections of `PickerItem`s (text, label, keywords); Ledge searches the
+  start of every word of the label and keywords (`PickerItem.matches`). `insert-text` lets Ledge type the pick into
+  the app; without it Ledge copies it. Keep Recents in `onPicked`. Check with `{"picked": "id"}` steps.
 - **Terminal** (0.18.0): a terminal page in the notch. The add-on runs the program on a pseudo-terminal and Ledge
   draws it; `AddOnTerminal().connect(&handlers)` is a whole terminal running the login shell. Declare `"terminal"` in
   both surfaces and capabilities. What the person types arrives in `onTerminalInput`: write it to the program and
