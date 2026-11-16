@@ -41,6 +41,13 @@ public struct AddOnHandlers: Sendable {
         throw AddOnError("This add-on doesn't provide Playing Next.")
     }
 
+    /// What the person typed or pasted in the add-on's terminal, in order (LedgeKit 0.18.0). Write it to the
+    /// program as is. It's theirs: never log it, store it or send it anywhere else.
+    public var onTerminalInput: @Sendable (Data) async -> Void = { _ in }
+    /// The terminal's size in characters, first when its page first shows and again whenever it changes. Start the
+    /// program on the first one, so it starts at the right size. Runs in order with input.
+    public var onTerminalResize: @Sendable (TerminalSize) async -> Void = { _ in }
+
     var methods: [String: @Sendable (JSONValue) async throws -> JSONValue] = [:]
 
     public init() {}
@@ -159,6 +166,41 @@ public enum AddOnSession {
         update(topic: Surface.playerTopic, payload: payload)
     }
 
+    /// Sends what the terminal's program wrote, in the order sent: Ledge draws it on the terminal page. Larger writes
+    /// are split. Declare `terminal` in the manifest. Needs 0.18.0.
+    public static func terminal(output: Data) {
+        guard let outbox = currentOutbox() else { return }
+        send(terminalOutput: output, to: outbox)
+    }
+
+    /// The ordered queue of the session this runs in: the task's own session's, or else the process's.
+    static func currentOutbox() -> AsyncStream<SessionMessage>.Continuation? {
+        sessionOutbox ?? outboxLock.withLock { orderedOutbox }
+    }
+
+    static func send(terminalOutput output: Data, to outbox: AsyncStream<SessionMessage>.Continuation) {
+        guard !output.isEmpty else { return }
+        var start = output.startIndex
+        while start < output.endIndex {
+            let end = output.index(start, offsetBy: Surface.maximumTerminalChunk, limitedBy: output.endIndex) ?? output.endIndex
+            if let payload = try? JSONValue(encoding: TerminalOutput(output[start..<end])) {
+                outbox.yield(.update(topic: Surface.terminalOutputTopic, payload: payload))
+            }
+            start = end
+        }
+    }
+
+    /// Shows the terminal's folder and whether its program is running, in order with its output. Needs 0.18.0.
+    public static func show(terminal: TerminalState) {
+        guard let outbox = currentOutbox() else { return }
+        send(terminalState: terminal, to: outbox)
+    }
+
+    static func send(terminalState: TerminalState, to outbox: AsyncStream<SessionMessage>.Continuation) {
+        guard let payload = try? JSONValue(encoding: terminalState) else { return }
+        outbox.yield(.update(topic: Surface.terminalStateTopic, payload: payload))
+    }
+
     /// Sends state for a surface or service by topic. `show(_:)` and `show(widgets:)` cover the surfaces.
     public static func update(topic: String, payload: JSONValue) {
         guard let current else { return }
@@ -166,6 +208,13 @@ public enum AddOnSession {
     }
 
     nonisolated(unsafe) private static var current: StandardOutput?
+    /// Messages that must reach Ledge in the order they're sent, like a terminal's output. `update` starts a task
+    /// per message, which can overtake one another; this goes through one queue.
+    nonisolated(unsafe) private static var orderedOutbox: AsyncStream<SessionMessage>.Continuation?
+    nonisolated(unsafe) private static var orderedOutboxOwner: UUID?
+    private static let outboxLock = NSLock()
+    /// The ordered queue of the session a handler runs in, for code that captures it and sends from elsewhere.
+    @TaskLocal static var sessionOutbox: AsyncStream<SessionMessage>.Continuation?
 
     /// The session loop, with its input and output passed in so it can be tested without a process.
     public static func run(
@@ -173,9 +222,31 @@ public enum AddOnSession {
         input: AsyncThrowingStream<Data, Error>, write: @escaping @Sendable (Data) async -> Void
     ) async -> Int32 {
         let calls = HostCalls(writer: write)
-        let status = await HostCalls.$current.withValue(calls) {
-            await loop(id: id, handlers: handlers, input: input, write: write, calls: calls)
+        let (ordered, outbox) = AsyncStream<SessionMessage>.makeStream()
+        let owner = UUID()
+        outboxLock.withLock {
+            orderedOutbox = outbox
+            orderedOutboxOwner = owner
         }
+        let sender = Task {
+            for await message in ordered {
+                if let line = try? message.encodedLine() { await write(line) }
+            }
+        }
+        let status = await HostCalls.$current.withValue(calls) {
+            await $sessionOutbox.withValue(outbox) {
+                await loop(id: id, handlers: handlers, input: input, write: write, calls: calls)
+            }
+        }
+        // Only this session's queue: an add-on runs one session, but tests run several side by side.
+        outboxLock.withLock {
+            if orderedOutboxOwner == owner {
+                orderedOutbox = nil
+                orderedOutboxOwner = nil
+            }
+        }
+        outbox.finish()
+        await sender.value
         await calls.endSession()
         return status
     }
@@ -261,6 +332,21 @@ public enum AddOnSession {
                         continue
                     }
                     await handlers.onVisibilityChange(visibility)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
+                // A terminal's input and size run in order, as typed, before anything sent after them.
+                case Surface.terminalInputMethod:
+                    guard active, let input = try? params.decode(TerminalOutput.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the input."))
+                        continue
+                    }
+                    await handlers.onTerminalInput(input.data)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
+                case Surface.terminalResizeMethod:
+                    guard active, let size = try? params.decode(TerminalSize.self), (try? size.validate()) != nil else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the size."))
+                        continue
+                    }
+                    await handlers.onTerminalResize(size)
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case Surface.eventMethod:
                     // Events run in order, before anything sent after them.

@@ -116,6 +116,10 @@ public struct AddOnManifest: Codable, Sendable, Equatable {
         for surface in surfaces ?? [] where !AddOnCapability.isWellFormed(surface) {
             throw ManifestValidationError.invalidField("surfaces")
         }
+        // A terminal runs programs as the person, so it can't come without the capability they approve.
+        if surfaces?.contains(Surface.terminal) == true, !capabilities.contains(Surface.terminalCapability) {
+            throw ManifestValidationError.invalidField("capabilities: the terminal surface needs the terminal capability")
+        }
         for (field, value) in [("kit.minAPI", kit?.minAPI), ("minLedge", minLedge)] {
             if let value, !Self.isReleaseVersion(value) { throw ManifestValidationError.invalidField(field) }
         }
@@ -195,7 +199,7 @@ public enum AddOnCapability {
     /// Capabilities this LedgeKit release documents. Not exhaustive at runtime: a newer package may name one a host
     /// has never heard of, which loads and is treated as not granted.
     public static let known: Set<String> = ["spotify-library", "notification-banners", "apple-music-queue", "apple-music-controls",
-                                            "clipboard-write", "hud", "notch-control"]
+                                            "clipboard-write", "hud", "notch-control", "terminal"]
 
     public static func isWellFormed(_ name: String) -> Bool {
         (1...64).contains(name.count) && name.allSatisfy { $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-") }

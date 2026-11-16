@@ -104,8 +104,13 @@ Read this before changing anything, and keep to it.
 - **Categories** (`category` in addon.json and listing.json): AI, Productivity, Media, Capture, Files or System.
 - **Capabilities** this LedgeKit knows: `clipboard-write` (`LedgeHost.copy`), `hud` (`LedgeHost.notify`),
   `notch-control` (`showPage`, `openSettings`, `holdOpen`), and the account ones Ledge brokers: `spotify-library`,
-  `apple-music-queue`, `apple-music-controls`, `notification-banners`. Settings, the environment and `dataFolder`
-  need none.
+  `apple-music-queue`, `apple-music-controls`, `notification-banners`, and `terminal` (with the terminal surface).
+  Settings, the environment and `dataFolder` need none.
+- **Terminal** (0.18.0): a terminal page in the notch. The add-on runs the program on a pseudo-terminal and Ledge
+  draws it; `AddOnTerminal().connect(&handlers)` is a whole terminal running the login shell. Declare `"terminal"` in
+  both surfaces and capabilities. What the person types arrives in `onTerminalInput`: write it to the program and
+  nowhere else, never log or store it. `ledgekit check` steps `{"type": "ls\n"}` type into it, and the report's
+  `terminal.output` is what the program wrote.
 
 ## Tools for AI apps
 

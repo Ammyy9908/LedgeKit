@@ -41,6 +41,11 @@ func check(_ given: [String]) async throws -> Bool {
     do {
         try await runtime.start()
         report.started = true
+        // A terminal starts at the size Ledge's first sends, as when its page first shows.
+        if (package.manifest.surfaces ?? []).contains(Surface.terminal) {
+            try await runtime.terminalResize(TerminalSize(columns: 80, rows: 24))
+            report.note("terminal: 80 × 24")
+        }
         for step in steps { try await play(step, on: runtime, host: host, report: report) }
         try await Task.sleep(nanoseconds: 300_000_000)   // the last updates
     } catch {
@@ -64,9 +69,11 @@ func check(_ given: [String]) async throws -> Bool {
 /// One step of a check. In JSON: {"wait": 1}, {"visible": ["notch-page"]},
 /// {"press": "add", "on": "notch-page", "screen": "list", "item": "n1"}, {"edit": "body", "text": "…", "on": "notch-page"},
 /// {"end": "body", "text": "…"}, {"toggle": "id", "on": "settings-page", "to": true}, {"pick": "id", "value": "x"},
-/// {"change": "id", "value": 0.5}, {"tool": "add_note", "arguments": {"text": "…"}}.
+/// {"change": "id", "value": 0.5}, {"tool": "add_note", "arguments": {"text": "…"}},
+/// {"type": "ls\n"} (into the terminal; a newline is Return).
 private struct Step: Decodable {
     var wait: Double?
+    var type: String?
     var visible: [String]?
     var tool: String?
     var arguments: JSONValue?
@@ -102,6 +109,12 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
         try? await runtime.visibilityChanged(SurfaceVisibility(visible: Set(visible)))
         return
     }
+    if let text = step.type {
+        // Return is a carriage return on a terminal; a newline in a script means Return.
+        try await runtime.terminalInput(Data(text.replacingOccurrences(of: "\n", with: "\r").utf8))
+        report.note("terminal: typed \(text.count) characters")
+        return
+    }
     if let name = step.tool {
         // As Ledge will: the tool must be one the add-on offered, and the arguments must fit it.
         guard let tool = report.lastTools().first(where: { $0.name == name }) else {
@@ -130,7 +143,7 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
     else if let id = step.toggle { control = id; action = .toggled(step.to ?? true) }
     else if let id = step.pick, case .string(let value)? = step.value { control = id; action = .picked(value) }
     else if let id = step.change, case .number(let value)? = step.value { control = id; action = .changed(value) }
-    else { throw CLIError("A script step does nothing: give it wait, visible, press, edit, end, toggle, pick, change or tool.") }
+    else { throw CLIError("A script step does nothing: give it wait, visible, press, edit, end, toggle, pick, change, tool or type.") }
     let surface = step.on ?? Surface.notchPage
     let event = SurfaceEvent(surface: surface, widget: step.widget, control: control, action: action, screen: step.screen, item: step.item)
     host.userActed()
@@ -291,6 +304,8 @@ private final class CheckReport: @unchecked Sendable {
     /// The last version of each surface Ledge took, as the add-on sent it: what a person would see when the check ends.
     private var last: [String: JSONValue] = [:]
     private(set) var hasPage = false
+    /// Everything the terminal's program wrote, up to 256 KB.
+    private var terminalOutput = Data()
     private(set) var hasAttentionActivity = false
 
     init(manifest: AddOnManifest) { self.manifest = manifest }
@@ -367,6 +382,16 @@ private final class CheckReport: @unchecked Sendable {
         }
         do {
             let update = try SurfaceUpdate.read(topic: topic, payload: payload, declared: Set(manifest.surfaces ?? []))
+            // A terminal's output is a stream, kept whole rather than as its last piece.
+            if case .terminalOutput(let data)? = update {
+                lock.withLock {
+                    sent[name, default: (0, 0, [])].sent += 1
+                    sent[name, default: (0, 0, [])].accepted += 1
+                    if terminalOutput.count < 262_144 { terminalOutput.append(data) }
+                }
+                newerThanMinAPI(update)
+                return
+            }
             lock.withLock {
                 sent[name, default: (0, 0, [])].sent += 1
                 sent[name, default: (0, 0, [])].accepted += 1
@@ -415,6 +440,7 @@ private final class CheckReport: @unchecked Sendable {
             if list.contains(where: { $0.size != .small }) { needs("0.15.0", "A medium or large widget") }
             if list.contains(where: { $0.compactContent != nil }) { needs("0.17.0", "A widget's compactContent") }
         case .tools?: needs("0.16.0", "Tools for AI apps")
+        case .terminalOutput?, .terminalState?: needs("0.18.0", "A terminal")
         default: break
         }
     }
@@ -453,6 +479,15 @@ private final class CheckReport: @unchecked Sendable {
         }
     }
 
+    /// A terminal's output as a person reads it: colors, cursor moves and titles taken out, Returns kept.
+    static func plainText(_ data: Data) -> String {
+        var text = String(decoding: data, as: UTF8.self)
+        for pattern in ["\u{1B}\\][^\u{07}\u{1B}]*(\u{07}|\u{1B}\\\\)", "\u{1B}\\[[0-9;?]*[ -/]*[@-~]", "\u{1B}[()][0-9A-Za-z]", "\u{1B}[=>78]"] {
+            text = text.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+        return text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "")
+    }
+
     func json() throws -> Data {
         try lock.withLock {
             let object: [String: Any] = [
@@ -472,6 +507,7 @@ private final class CheckReport: @unchecked Sendable {
                     ["surface": $0, "declared": true, "sent": 0, "accepted": 0, "refusals": [String]()] as [String: Any]
                 },
                 "calls": calls,
+                "terminal": terminalOutput.isEmpty ? NSNull() : ["output": Self.plainText(terminalOutput)] as Any,
                 "denied": denied,
                 "tools": tools,
                 "problems": problems,

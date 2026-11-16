@@ -1,3 +1,4 @@
+import Foundation
 import LedgeKit
 
 /// One surface an add-on sent, read the way Ledge reads it: decoded, checked against the surfaces the manifest
@@ -16,6 +17,9 @@ public enum SurfaceUpdate: Sendable, Equatable {
     /// Nil takes it down.
     case player(PlayerExtension?)
     case tools([AddOnTool])
+    /// What the terminal's program wrote, to draw after what came before.
+    case terminalOutput(Data)
+    case terminalState(TerminalState)
 
     /// The surface name the topic belongs to, as `addon.json` lists it; nil for a topic Ledge doesn't know.
     public static func surface(forTopic topic: String) -> String? {
@@ -29,6 +33,7 @@ public enum SurfaceUpdate: Sendable, Equatable {
         case Surface.notchPageTopic: Surface.notchPage
         case Surface.playerTopic: Surface.player
         case Surface.aiToolsTopic: Surface.aiTool
+        case Surface.terminalOutputTopic, Surface.terminalStateTopic: Surface.terminal
         default: nil
         }
     }
@@ -72,6 +77,14 @@ public enum SurfaceUpdate: Sendable, Equatable {
             let tools = try payload.decode([AddOnTool].self)
             try AddOnTool.validate(tools)
             return .tools(tools)
+        case Surface.terminalOutputTopic:
+            let output = try payload.decode(TerminalOutput.self)
+            try output.validate()
+            return .terminalOutput(output.data)
+        case Surface.terminalStateTopic:
+            let state = try payload.decode(TerminalState.self)
+            try state.validate()
+            return .terminalState(state)
         case Surface.playerTopic:
             let player = payload == .null ? nil : try payload.decode(PlayerExtension.self)
             try player?.validate()

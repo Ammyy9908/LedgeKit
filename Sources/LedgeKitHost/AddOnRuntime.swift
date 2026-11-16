@@ -116,6 +116,28 @@ public actor AddOnRuntime {
         return try await send(method, params: params, timeout: timeout ?? limits.request)
     }
 
+    /// Sends what the person typed in the add-on's terminal (`ledge.terminalInput`, LedgeKit 0.18.0), in the order
+    /// called, without waiting for the answer: typing never waits on the add-on.
+    public func terminalInput(_ data: Data) throws {
+        guard state == .running else { throw AddOnRuntimeError.notRunning }
+        try post(Surface.terminalInputMethod, params: JSONValue(encoding: TerminalOutput(data)))
+    }
+
+    /// Sends the add-on's terminal its size in characters (`ledge.terminalResize`), in order with input.
+    public func terminalResize(_ size: TerminalSize) throws {
+        guard state == .running else { throw AddOnRuntimeError.notRunning }
+        try size.validate()
+        try post(Surface.terminalResizeMethod, params: JSONValue(encoding: size))
+    }
+
+    /// Writes a request and doesn't wait: its answer, when it comes, matches nothing pending and is dropped.
+    private func post(_ method: String, params: JSONValue) throws {
+        guard let process else { throw AddOnRuntimeError.notRunning }
+        let id = nextRequestID
+        nextRequestID += 1
+        process.write(try SessionMessage.request(id: id, method: method, params: params).encodedLine())
+    }
+
     /// Sends a surface event (`ledge.surfaceEvent`), the one reserved method the app sends during a session.
     public func sendEvent(_ params: JSONValue, timeout: TimeInterval? = nil) async throws -> JSONValue {
         guard state == .running else { throw AddOnRuntimeError.notRunning }
@@ -209,8 +231,16 @@ public actor AddOnRuntime {
         let session = generation
         let spawned: RunningProcess
         do {
-            spawned = try RunningProcess(executable: executable, arguments: arguments, diagnostics: diagnostics) { [weak self] input in
-                Task { await self?.handle(input, generation: session) }
+            // One task reads the add-on's lines, in the order it wrote them: a terminal's output is a stream, where
+            // a line handled out of turn garbles the screen. A task per line doesn't promise that order.
+            let (lines, sink) = AsyncStream<RunningProcess.Input>.makeStream()
+            spawned = try RunningProcess(executable: executable, arguments: arguments, diagnostics: diagnostics) { input in
+                sink.yield(input)
+                // The exit is watched on another thread than the output, so lines can still follow it.
+                if case .exited = input { DispatchQueue.global().asyncAfter(deadline: .now() + 1) { sink.finish() } }
+            }
+            Task { [weak self] in
+                for await input in lines { await self?.handle(input, generation: session) }
             }
         } catch {
             state = .failed("Couldn't start the add-on: \(error.localizedDescription)")
