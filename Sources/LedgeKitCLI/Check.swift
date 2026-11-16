@@ -70,10 +70,12 @@ func check(_ given: [String]) async throws -> Bool {
 /// {"press": "add", "on": "notch-page", "screen": "list", "item": "n1"}, {"edit": "body", "text": "…", "on": "notch-page"},
 /// {"end": "body", "text": "…"}, {"toggle": "id", "on": "settings-page", "to": true}, {"pick": "id", "value": "x"},
 /// {"change": "id", "value": 0.5}, {"tool": "add_note", "arguments": {"text": "…"}},
-/// {"type": "ls\n"} (into the terminal; a newline is Return).
+/// {"type": "ls\n"} (into the terminal; a newline is Return), {"picked": "heart", "section": "smileys"} (from the picker).
 private struct Step: Decodable {
     var wait: Double?
     var type: String?
+    var picked: String?
+    var section: String?
     var visible: [String]?
     var tool: String?
     var arguments: JSONValue?
@@ -115,6 +117,18 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
         report.note("terminal: typed \(text.count) characters")
         return
     }
+    if let id = step.picked {
+        // As Ledge will: only an item the picker holds.
+        guard let picker = report.lastPicker(),
+              let section = picker.sections.first(where: { step.section == nil ? $0.items.contains { $0.id == id } : $0.id == step.section }),
+              section.items.contains(where: { $0.id == id }) else {
+            report.problem("The script picks \(id), which isn't in the picker the add-on sent.")
+            return
+        }
+        try await runtime.picked(PickedItem(section: section.id, id: id))
+        report.note("picker: picked \(section.id)/\(id)")
+        return
+    }
     if let name = step.tool {
         // As Ledge will: the tool must be one the add-on offered, and the arguments must fit it.
         guard let tool = report.lastTools().first(where: { $0.name == name }) else {
@@ -143,7 +157,7 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
     else if let id = step.toggle { control = id; action = .toggled(step.to ?? true) }
     else if let id = step.pick, case .string(let value)? = step.value { control = id; action = .picked(value) }
     else if let id = step.change, case .number(let value)? = step.value { control = id; action = .changed(value) }
-    else { throw CLIError("A script step does nothing: give it wait, visible, press, edit, end, toggle, pick, change, tool or type.") }
+    else { throw CLIError("A script step does nothing: give it wait, visible, press, edit, end, toggle, pick, change, tool, type or picked.") }
     let surface = step.on ?? Surface.notchPage
     let event = SurfaceEvent(surface: surface, widget: step.widget, control: control, action: action, screen: step.screen, item: step.item)
     host.userActed()
@@ -322,6 +336,11 @@ private final class CheckReport: @unchecked Sendable {
     /// Tool calls the script made, and what came back.
     private var tools: [[String: Any]] = []
 
+    /// The picker the add-on last sent.
+    func lastPicker() -> Picker? {
+        lock.withLock { try? last[Surface.picker]?.decode(Picker.self) }
+    }
+
     /// The tools the add-on last offered.
     func lastTools() -> [AddOnTool] {
         lock.withLock { (try? last[Surface.aiTool]?.decode([AddOnTool].self)) ?? [] }
@@ -441,6 +460,7 @@ private final class CheckReport: @unchecked Sendable {
             if list.contains(where: { $0.compactContent != nil }) { needs("0.17.0", "A widget's compactContent") }
         case .tools?: needs("0.16.0", "Tools for AI apps")
         case .terminalOutput?, .terminalState?: needs("0.18.0", "A terminal")
+        case .picker?: needs("0.19.0", "A picker")
         default: break
         }
     }

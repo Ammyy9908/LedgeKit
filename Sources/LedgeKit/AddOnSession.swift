@@ -48,6 +48,10 @@ public struct AddOnHandlers: Sendable {
     /// program on the first one, so it starts at the right size. Runs in order with input.
     public var onTerminalResize: @Sendable (TerminalSize) async -> Void = { _ in }
 
+    /// The person picked one of the picker's items (LedgeKit 0.19.0). Ledge has already put its text in, or copied
+    /// it. Keep Recents here, and send the picker again. Runs in order with events.
+    public var onPicked: @Sendable (PickedItem) async -> Void = { _ in }
+
     var methods: [String: @Sendable (JSONValue) async throws -> JSONValue] = [:]
 
     public init() {}
@@ -164,6 +168,13 @@ public enum AddOnSession {
     public static func show(player: PlayerExtension?) {
         guard let payload = try? JSONValue(encoding: player) else { return }
         update(topic: Surface.playerTopic, payload: payload)
+    }
+
+    /// Shows the add-on's picker's items, replacing the last ones; nil takes the picker away. Declare `picker` in the
+    /// manifest. Needs 0.19.0.
+    public static func show(picker: Picker?) {
+        guard let payload = try? JSONValue(encoding: picker) else { return }
+        update(topic: Surface.pickerTopic, payload: payload)
     }
 
     /// Sends what the terminal's program wrote, in the order sent: Ledge draws it on the terminal page. Larger writes
@@ -340,6 +351,13 @@ public enum AddOnSession {
                         continue
                     }
                     await handlers.onTerminalInput(input.data)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
+                case Surface.pickedMethod:
+                    guard active, let picked = try? params.decode(PickedItem.self) else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read what was picked."))
+                        continue
+                    }
+                    await handlers.onPicked(picked)
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case Surface.terminalResizeMethod:
                     guard active, let size = try? params.decode(TerminalSize.self), (try? size.validate()) != nil else {

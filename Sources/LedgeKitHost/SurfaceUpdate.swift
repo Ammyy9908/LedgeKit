@@ -20,6 +20,8 @@ public enum SurfaceUpdate: Sendable, Equatable {
     /// What the terminal's program wrote, to draw after what came before.
     case terminalOutput(Data)
     case terminalState(TerminalState)
+    /// Nil takes it away.
+    case picker(Picker?)
 
     /// The surface name the topic belongs to, as `addon.json` lists it; nil for a topic Ledge doesn't know.
     public static func surface(forTopic topic: String) -> String? {
@@ -34,6 +36,7 @@ public enum SurfaceUpdate: Sendable, Equatable {
         case Surface.playerTopic: Surface.player
         case Surface.aiToolsTopic: Surface.aiTool
         case Surface.terminalOutputTopic, Surface.terminalStateTopic: Surface.terminal
+        case Surface.pickerTopic: Surface.picker
         default: nil
         }
     }
@@ -77,6 +80,10 @@ public enum SurfaceUpdate: Sendable, Equatable {
             let tools = try payload.decode([AddOnTool].self)
             try AddOnTool.validate(tools)
             return .tools(tools)
+        case Surface.pickerTopic:
+            let picker = payload == .null ? nil : try payload.decode(Picker.self)
+            try picker?.validate()
+            return .picker(picker)
         case Surface.terminalOutputTopic:
             let output = try payload.decode(TerminalOutput.self)
             try output.validate()

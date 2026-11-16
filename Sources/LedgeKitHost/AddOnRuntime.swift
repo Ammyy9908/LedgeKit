@@ -116,6 +116,12 @@ public actor AddOnRuntime {
         return try await send(method, params: params, timeout: timeout ?? limits.request)
     }
 
+    /// Tells the add-on what the person picked in its picker (`ledge.picked`, LedgeKit 0.19.0).
+    public func picked(_ item: PickedItem) async throws {
+        guard state == .running else { throw AddOnRuntimeError.notRunning }
+        _ = try await send(Surface.pickedMethod, params: JSONValue(encoding: item), timeout: limits.request)
+    }
+
     /// Sends what the person typed in the add-on's terminal (`ledge.terminalInput`, LedgeKit 0.18.0), in the order
     /// called, without waiting for the answer: typing never waits on the add-on.
     public func terminalInput(_ data: Data) throws {
