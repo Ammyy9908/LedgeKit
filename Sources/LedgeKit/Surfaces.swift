@@ -60,6 +60,7 @@ public enum Surface {
     public static let maximumListRows = 100
     public static let maximumPageActions = 3
     public static let maximumEditorText = 50_000
+    public static let maximumPageImageBytes = 32_768
 }
 
 // MARK: Settings page
@@ -334,7 +335,8 @@ public struct PlayerQueueEntry: Codable, Sendable, Equatable {
 public struct LiveActivity: Codable, Sendable, Equatable {
     public var id: String
     public var symbol: String
-    /// Up to 60 characters; keep it to a few words.
+    /// Up to 60 characters; keep it to a few words. With progress it may be empty: closed, the notch then shows the
+    /// add-on's icon and the progress alone, and a green tick when done. Give it an `accessibilityValue`. Needs 0.21.0.
     public var text: String
     public var progress: Progress?
     public var importance: Importance
@@ -345,9 +347,13 @@ public struct LiveActivity: Codable, Sendable, Equatable {
     /// What VoiceOver says for the activity, when the text alone doesn't, like "4 minutes 59 seconds left" for
     /// "4:59". Up to 120 characters. Needs 0.13.0.
     public var accessibilityValue: String?
+    /// A small PNG (up to 64 KB) that stands for the activity when its text is empty, like an agent's mascot, in place
+    /// of the add-on's icon. While the progress is indeterminate Ledge makes it dance. Needs 0.21.0.
+    public var image: Data?
 
     public init(_ id: String, symbol: String, text: String, progress: Progress? = nil,
-                importance: Importance = .normal, lasts: Double? = nil, kind: Kind? = nil, accessibilityValue: String? = nil) {
+                importance: Importance = .normal, lasts: Double? = nil, kind: Kind? = nil, accessibilityValue: String? = nil,
+                image: Data? = nil) {
         self.id = id
         self.symbol = symbol
         self.text = text
@@ -356,6 +362,7 @@ public struct LiveActivity: Codable, Sendable, Equatable {
         self.lasts = lasts
         self.kind = kind
         self.accessibilityValue = accessibilityValue
+        self.image = image
     }
 
     /// Kinds of activity Ledge has of its own. While Ledge's own of the same kind is up, the add-on's isn't shown,
@@ -636,6 +643,15 @@ public indirect enum PageNode: Codable, Sendable, Equatable {
     /// add-on sends the screen again, so keep the editor's `id` the same. Sends `edited` as they type and `ended`
     /// when the editor loses the keyboard. At most one editor per screen.
     case editor(id: String, text: String, placeholder: String?, autofocus: Bool)
+    /// A small picture the add-on carries in the page itself: PNG bytes, up to ``Surface/maximumPageImageBytes``,
+    /// drawn `size` points square (16 to 128, 24 if nil). `motion` moves it, such as `.shake` while something works;
+    /// Ledge keeps it still when the person turned on Reduce motion. Needs 0.21.0.
+    case image(Data, size: Double?, motion: Motion?)
+
+    public enum Motion: String, Codable, Sendable {
+        /// A little side-to-side shake, over and over.
+        case shake
+    }
 }
 
 /// A row in a notch page's list.
@@ -857,6 +873,10 @@ extension PageScreen {
                 guard !symbol.isEmpty, !title.isEmpty else { throw SurfaceValidationError.invalid("empty state") }
                 try checkText(title)
                 try checkText(detail)
+            case let .image(data, size, _):
+                guard data.count <= Surface.maximumPageImageBytes else { throw SurfaceValidationError.tooLarge("image over \(Surface.maximumPageImageBytes) bytes") }
+                guard data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) else { throw SurfaceValidationError.invalid("image that isn't a PNG") }
+                guard (16...128).contains(size ?? 24) else { throw SurfaceValidationError.invalid("image size \(size ?? 24)") }
             case let .editor(id, text, placeholder, _):
                 guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 editors += 1
@@ -936,7 +956,7 @@ extension LiveActivity {
             guard !activity.id.isEmpty, activity.id.count <= 64, ids.insert(activity.id).inserted
             else { throw SurfaceValidationError.duplicateID(activity.id) }
             guard !activity.symbol.isEmpty, activity.symbol.count <= 100 else { throw SurfaceValidationError.invalid("symbol of \(activity.id)") }
-            guard !activity.text.isEmpty, activity.text.count <= Surface.maximumActivityText
+            guard !activity.text.isEmpty || activity.progress != nil, activity.text.count <= Surface.maximumActivityText
             else { throw SurfaceValidationError.invalid("text of \(activity.id)") }
             if case .fraction(let value)? = activity.progress, !(0...1).contains(value) {
                 throw SurfaceValidationError.invalid("progress of \(activity.id)")
@@ -945,6 +965,7 @@ extension LiveActivity {
             if let value = activity.accessibilityValue, value.isEmpty || value.count > 120 {
                 throw SurfaceValidationError.invalid("accessibilityValue of \(activity.id)")
             }
+            if let image = activity.image, image.isEmpty || image.count > 64 * 1024 { throw SurfaceValidationError.invalid("image of \(activity.id)") }
         }
     }
 }

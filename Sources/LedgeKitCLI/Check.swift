@@ -492,6 +492,7 @@ private final class CheckReport: @unchecked Sendable {
         case .notchPage(let page)?:
             needs("0.12.0", "A notch page")
             if page?.screen.content.listRows.contains(where: { $0.acceptsFiles == true }) == true { needs("0.20.0", "A list row that takes files") }
+            if page?.screen.content.hasImage == true { needs("0.21.0", "An image on a page") }
         case .activities(let list)?:
             if list.contains(where: { $0.kind != nil || $0.accessibilityValue != nil || $0.importance == .attention }) {
                 needs("0.13.0", "An activity's kind, accessibilityValue or .attention")

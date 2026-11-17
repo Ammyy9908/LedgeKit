@@ -95,3 +95,20 @@ private let emptyScreen = PageScreen("list", title: "Notes",
     #expect(Surface.notchPageTopic == "surface.notch-page")
     #expect(Surface.notchPage == "notch-page")
 }
+
+@Test func pageImagesArePNGsOfASensibleSize() throws {
+    let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 0, count: 64)
+    func page(_ image: PageNode) -> NotchPage {
+        NotchPage(title: "Agents", symbol: "sparkle", screen: PageScreen("main", content: .hstack(spacing: 8, children: [image, .text("Claude", style: .title)])))
+    }
+    let shaking = page(.image(png, size: 20, motion: .shake))
+    try shaking.validate()
+    #expect(try JSONDecoder().decode(NotchPage.self, from: JSONEncoder().encode(shaking)) == shaking)
+    #expect(shaking.screen.content.hasImage)
+    try page(.image(png, size: nil, motion: nil)).validate()
+    #expect(throws: SurfaceValidationError.self) { try page(.image(Data("GIF89a".utf8), size: 20, motion: nil)).validate() }
+    #expect(throws: SurfaceValidationError.self) { try page(.image(png, size: 400, motion: nil)).validate() }
+    #expect(throws: SurfaceValidationError.self) {
+        try page(.image(png + Data(count: Surface.maximumPageImageBytes), size: 20, motion: nil)).validate()
+    }
+}

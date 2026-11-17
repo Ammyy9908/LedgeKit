@@ -121,6 +121,12 @@ private actor Seen {
     #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: String(repeating: "x", count: 61))]) }
     #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "y", progress: .fraction(2))]) }
     #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "y", lasts: 0)]) }
+    // Empty text only with progress: the notch shows the add-on's icon and the ring.
+    try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "", progress: .indeterminate)])
+    #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "")]) }
+    let agent = LiveActivity("a", symbol: "x", text: "", progress: .done, image: Data([0x89, 0x50, 0x4E, 0x47]))
+    #expect(try JSONDecoder().decode(LiveActivity.self, from: JSONEncoder().encode(agent)) == agent)
+    #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "y", image: Data(count: 64 * 1024 + 1))]) }
     #expect(throws: (any Error).self) {
         try LiveActivity.validate((0..<3).map { LiveActivity("a\($0)", symbol: "x", text: "y") })
     }
