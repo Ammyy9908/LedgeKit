@@ -129,6 +129,23 @@ private func check(_ folder: URL, into report: inout Report) {
             report.errors.append("Assets/Icon.png isn't a PNG Ledge can read.")
         }
     }
+    // Optional: the Icon Composer icon Ledge draws in the person's icon style. The Store compiles it, so it must be
+    // self-contained, and the compiled Icon.car is a build product, never part of the folder.
+    if exists("Assets/Icon.icon") {
+        let document = folder.appendingPathComponent("Assets/Icon.icon")
+        if let data = try? Data(contentsOf: document.appendingPathComponent("icon.json")),
+           let icon = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let layers = (icon["groups"] as? [[String: Any]] ?? []).flatMap { $0["layers"] as? [[String: Any]] ?? [] }
+            if layers.isEmpty { report.errors.append("Assets/Icon.icon has no layers.") }
+            for name in layers.compactMap({ $0["image-name"] as? String })
+            where !manager.fileExists(atPath: document.appendingPathComponent("Assets/" + name).path) {
+                report.errors.append("Assets/Icon.icon names \(name), which isn't in its Assets folder.")
+            }
+        } else {
+            report.errors.append("Assets/Icon.icon/icon.json is missing or isn't JSON. Make it in Icon Composer.")
+        }
+    }
+    if exists("Assets/Icon.car") { report.errors.append("Assets/Icon.car is built from Assets/Icon.icon; leave it out.") }
 
     // Size limits, as CI applies them.
     for path in (try? manager.subpathsOfDirectory(atPath: folder.path)) ?? [] {
