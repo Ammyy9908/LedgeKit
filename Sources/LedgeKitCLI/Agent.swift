@@ -106,6 +106,12 @@ Read this before changing anything, and keep to it.
   `notch-control` (`showPage`, `openSettings`, `holdOpen`), and the account ones Ledge brokers: `spotify-library`,
   `apple-music-queue`, `apple-music-controls`, `notification-banners`, and `terminal` (with the terminal surface).
   Settings, the environment and `dataFolder` need none.
+- **Sharing** (0.20.0): files the person sends to the add-on. `AddOnSession.show(shareTarget:)` lists destinations
+  (such as nearby devices) under "Send with ‹title›" on shelf items, and a `ListRow(acceptsFiles: true)` takes files
+  dropped on it; both arrive in `onShare` with the destination or row id. Needs `shared-files` (and the
+  `share-target` surface for the menu). `LedgeHost.addToShelf(_:)` puts received files on the shelf (`shelf-add`),
+  `LedgeHost.ask(_:)` asks a yes-or-no question in the notch (`questions`), and `local-network` declares talking
+  to devices on the network. Check with `{"share": ["/path"], "destination": "id"}` steps; a check answers yes.
 - **Picker** (0.19.0): a floating panel on a shortcut, searching the add-on's items (emoji, symbols, snippets).
   Send `AddOnSession.show(picker:)` with sections of `PickerItem`s (text, label, keywords); Ledge searches the
   start of every word of the label and keywords (`PickerItem.matches`). `insert-text` lets Ledge type the pick into

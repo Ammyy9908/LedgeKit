@@ -70,8 +70,11 @@ func check(_ given: [String]) async throws -> Bool {
 /// {"press": "add", "on": "notch-page", "screen": "list", "item": "n1"}, {"edit": "body", "text": "…", "on": "notch-page"},
 /// {"end": "body", "text": "…"}, {"toggle": "id", "on": "settings-page", "to": true}, {"pick": "id", "value": "x"},
 /// {"change": "id", "value": 0.5}, {"tool": "add_note", "arguments": {"text": "…"}},
-/// {"type": "ls\n"} (into the terminal; a newline is Return), {"picked": "heart", "section": "smileys"} (from the picker).
+/// {"type": "ls\n"} (into the terminal; a newline is Return), {"picked": "heart", "section": "smileys"} (from the picker),
+/// {"share": ["/path/a.png"], "destination": "pixel"} (from the shelf's share menu, or dropped on a list row).
 private struct Step: Decodable {
+    var share: [String]?
+    var destination: String?
     var wait: Double?
     var type: String?
     var picked: String?
@@ -127,6 +130,17 @@ private func play(_ step: Step, on runtime: AddOnRuntime, host: SimulatedHost, r
         }
         try await runtime.picked(PickedItem(section: section.id, id: id))
         report.note("picker: picked \(section.id)/\(id)")
+        return
+    }
+    if let files = step.share {
+        // As Ledge will: only a destination the add-on offered, in its share target or a list row that takes files.
+        let destination = step.destination ?? ""
+        guard report.shareDestinations().contains(destination) else {
+            report.problem("The script shares with \(destination), which isn't a destination or a row that takes files.")
+            return
+        }
+        try await runtime.shared(SharedFiles(destination: destination, files: files))
+        report.note("shared \(files.count) file\(files.count == 1 ? "" : "s") with \(destination)")
         return
     }
     if let name = step.tool {
@@ -290,6 +304,25 @@ private final class SimulatedHost: @unchecked Sendable {
             }
             report.call(method)
             return .bool(true)
+        case LedgeHost.Method.addToShelf:
+            needs("0.20.0", "LedgeHost.addToShelf(_:)")
+            try require(Surface.shelfAddCapability)
+            guard case .array(let files)? = object["files"], (1...Surface.maximumSharedFiles).contains(files.count) else {
+                report.call(method, refused: "give 1 to \(Surface.maximumSharedFiles) files")
+                throw CLIError("No files.")
+            }
+            report.call(method, detail: "\(files.count) file\(files.count == 1 ? "" : "s")")
+            return .bool(true)
+        case LedgeHost.Method.ask:
+            needs("0.20.0", "LedgeHost.ask(_:)")
+            try require(Surface.questionsCapability)
+            guard let question = try? object["question"]?.decode(HostQuestion.self), (try? question.validate()) != nil else {
+                report.call(method, refused: "the question isn't valid")
+                throw CLIError("Invalid question.")
+            }
+            // A check answers yes, so the add-on's next steps run.
+            report.call(method, detail: "\(question.title) → \(question.accept)")
+            return .bool(true)
         case LedgeHost.Method.holdOpen:
             needs("0.13.0", "LedgeHost.holdOpen(_:)")
             try require("notch-control")
@@ -339,6 +372,17 @@ private final class CheckReport: @unchecked Sendable {
     /// The picker the add-on last sent.
     func lastPicker() -> Picker? {
         lock.withLock { try? last[Surface.picker]?.decode(Picker.self) }
+    }
+
+    /// Where files can be shared: the share target's destinations and the notch page's rows that take files.
+    func shareDestinations() -> Set<String> {
+        lock.withLock {
+            var ids = Set(((try? last[Surface.shareTarget]?.decode(ShareTarget.self))?.destinations ?? []).map(\.id))
+            if let page = try? last[Surface.notchPage]?.decode(NotchPage.self) {
+                ids.formUnion(page.screen.content.listRows.filter { $0.acceptsFiles == true }.map(\.id))
+            }
+            return ids
+        }
     }
 
     /// The tools the add-on last offered.
@@ -445,7 +489,9 @@ private final class CheckReport: @unchecked Sendable {
             }
         }
         switch update {
-        case .notchPage?: needs("0.12.0", "A notch page")
+        case .notchPage(let page)?:
+            needs("0.12.0", "A notch page")
+            if page?.screen.content.listRows.contains(where: { $0.acceptsFiles == true }) == true { needs("0.20.0", "A list row that takes files") }
         case .activities(let list)?:
             if list.contains(where: { $0.kind != nil || $0.accessibilityValue != nil || $0.importance == .attention }) {
                 needs("0.13.0", "An activity's kind, accessibilityValue or .attention")
@@ -461,6 +507,7 @@ private final class CheckReport: @unchecked Sendable {
         case .tools?: needs("0.16.0", "Tools for AI apps")
         case .terminalOutput?, .terminalState?: needs("0.18.0", "A terminal")
         case .picker?: needs("0.19.0", "A picker")
+        case .shareTarget?: needs("0.20.0", "A share target")
         default: break
         }
     }

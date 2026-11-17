@@ -120,6 +120,10 @@ public struct AddOnManifest: Codable, Sendable, Equatable {
         if surfaces?.contains(Surface.terminal) == true, !capabilities.contains(Surface.terminalCapability) {
             throw ManifestValidationError.invalidField("capabilities: the terminal surface needs the terminal capability")
         }
+        // A share target hands the add-on the person's files, so it can't come without the capability they approve.
+        if surfaces?.contains(Surface.shareTarget) == true, !capabilities.contains(Surface.sharedFilesCapability) {
+            throw ManifestValidationError.invalidField("capabilities: the share-target surface needs the shared-files capability")
+        }
         for (field, value) in [("kit.minAPI", kit?.minAPI), ("minLedge", minLedge)] {
             if let value, !Self.isReleaseVersion(value) { throw ManifestValidationError.invalidField(field) }
         }
@@ -199,7 +203,8 @@ public enum AddOnCapability {
     /// Capabilities this LedgeKit release documents. Not exhaustive at runtime: a newer package may name one a host
     /// has never heard of, which loads and is treated as not granted.
     public static let known: Set<String> = ["spotify-library", "notification-banners", "apple-music-queue", "apple-music-controls",
-                                            "clipboard-write", "hud", "notch-control", "terminal", "insert-text"]
+                                            "clipboard-write", "hud", "notch-control", "terminal", "insert-text",
+                                            "shared-files", "shelf-add", "questions", "local-network"]
 
     public static func isWellFormed(_ name: String) -> Bool {
         (1...64).contains(name.count) && name.allSatisfy { $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-") }

@@ -648,13 +648,18 @@ public struct ListRow: Codable, Sendable, Equatable {
     public var detail: String?
     /// An optional SF Symbol at the start of the row.
     public var symbol: String?
+    /// Files dropped on the row go to `AddOnHandlers.onShare`, with the row's id as the destination (LedgeKit
+    /// 0.20.0). Needs the `shared-files` capability; without it, or in an older Ledge, the row takes no drops.
+    public var acceptsFiles: Bool?
 
-    public init(_ id: String, title: String, subtitle: String? = nil, detail: String? = nil, symbol: String? = nil) {
+    public init(_ id: String, title: String, subtitle: String? = nil, detail: String? = nil, symbol: String? = nil,
+                acceptsFiles: Bool = false) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.detail = detail
         self.symbol = symbol
+        self.acceptsFiles = acceptsFiles ? true : nil
     }
 }
 

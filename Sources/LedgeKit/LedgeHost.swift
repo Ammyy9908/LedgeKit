@@ -22,6 +22,8 @@ public enum LedgeHost {
         public static let showPage = "ledge.showPage"
         public static let openSettings = "ledge.openSettings"
         public static let holdOpen = "ledge.holdOpen"
+        public static let addToShelf = "ledge.addToShelf"
+        public static let ask = "ledge.ask"
     }
 
     /// The longest Ledge takes to answer a call before it throws.
@@ -90,6 +92,24 @@ public enum LedgeHost {
         _ = try await call(Method.holdOpen, ["on": .bool(on)])
     }
 
+    // MARK: The shelf and questions
+
+    /// Puts files on the person's shelf, such as ones the add-on just received. They stay where they are; the shelf
+    /// shows them. At most 100 at a time. Needs the `shelf-add` capability. Needs 0.20.0.
+    public static func addToShelf(_ files: [URL]) async throws {
+        _ = try await call(Method.addToShelf, ["files": .array(files.map { .string($0.path) })])
+    }
+
+    /// Asks the person a yes-or-no question in the notch, such as whether to accept a transfer, and waits for the
+    /// answer: true for the accept button, false for decline, closing it, or no answer in `question.timeout`.
+    /// Ledge asks one question at a time, so don't ask again while one is up. Needs the `questions` capability.
+    /// Needs 0.20.0.
+    public static func ask(_ question: HostQuestion) async throws -> Bool {
+        let result = try await call(Method.ask, ["question": try JSONValue(encoding: question)], timeout: question.timeout + timeout)
+        guard case .bool(let answer) = result else { throw LedgeHostError("Ledge didn't answer the question.") }
+        return answer
+    }
+
     // MARK: Actions
 
     /// Opens a web or mail link (`https`, `http`, `mailto`) in the user's default app.
@@ -129,7 +149,7 @@ public enum LedgeHost {
         return try await call(Method.http, params).decode(HostResponse.self)
     }
 
-    static func call(_ method: String, _ params: [String: JSONValue]) async throws -> JSONValue {
+    static func call(_ method: String, _ params: [String: JSONValue], timeout: TimeInterval = timeout) async throws -> JSONValue {
         guard let calls = HostCalls.current else { throw LedgeHostError("Not running in a Ledge session.") }
         return try await calls.call(method, params: .object(params), timeout: timeout)
     }

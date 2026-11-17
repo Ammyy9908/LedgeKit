@@ -52,6 +52,11 @@ public struct AddOnHandlers: Sendable {
     /// it. Keep Recents here, and send the picker again. Runs in order with events.
     public var onPicked: @Sendable (PickedItem) async -> Void = { _ in }
 
+    /// The person shared files with the add-on (LedgeKit 0.20.0): chose one of its `ShareTarget` destinations on a
+    /// shelf item, or dropped files on a list row with `acceptsFiles`. Read the files now; they stay the person's.
+    /// Runs in order with events.
+    public var onShare: @Sendable (SharedFiles) async -> Void = { _ in }
+
     var methods: [String: @Sendable (JSONValue) async throws -> JSONValue] = [:]
 
     public init() {}
@@ -172,6 +177,13 @@ public enum AddOnSession {
 
     /// Shows the add-on's picker's items, replacing the last ones; nil takes the picker away. Declare `picker` in the
     /// manifest. Needs 0.19.0.
+    /// Lists the add-on's destinations in the shelf's share menu (LedgeKit 0.20.0); nil takes them away. Needs the
+    /// `share-target` surface and the `shared-files` capability.
+    public static func show(shareTarget: ShareTarget?) {
+        guard let payload = try? JSONValue(encoding: shareTarget) else { return }
+        update(topic: Surface.shareTargetTopic, payload: payload)
+    }
+
     public static func show(picker: Picker?) {
         guard let payload = try? JSONValue(encoding: picker) else { return }
         update(topic: Surface.pickerTopic, payload: payload)
@@ -351,6 +363,13 @@ public enum AddOnSession {
                         continue
                     }
                     await handlers.onTerminalInput(input.data)
+                    await send(.response(id: requestID, result: .bool(true), error: nil))
+                case Surface.sharedMethod:
+                    guard active, let shared = try? params.decode(SharedFiles.self), (try? shared.validate()) != nil else {
+                        await send(.response(id: requestID, result: nil, error: "The add-on couldn't read the shared files."))
+                        continue
+                    }
+                    await handlers.onShare(shared)
                     await send(.response(id: requestID, result: .bool(true), error: nil))
                 case Surface.pickedMethod:
                     guard active, let picked = try? params.decode(PickedItem.self) else {
