@@ -145,4 +145,13 @@ extension PageNode {
         default: []
         }
     }
+
+    /// Whether an image is anywhere in it, which needs 0.21.0.
+    public var hasImage: Bool {
+        switch self {
+        case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.hasImage)
+        case .image: true
+        default: false
+        }
+    }
 }
