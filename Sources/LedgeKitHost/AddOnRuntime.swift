@@ -116,6 +116,14 @@ public actor AddOnRuntime {
         return try await send(method, params: params, timeout: timeout ?? limits.request)
     }
 
+    /// Hands the add-on files the person shared with it (`ledge.shared`, LedgeKit 0.20.0): from the shelf's share
+    /// menu, or dropped on a list row.
+    public func shared(_ files: SharedFiles) async throws {
+        guard state == .running else { throw AddOnRuntimeError.notRunning }
+        try files.validate()
+        _ = try await send(Surface.sharedMethod, params: JSONValue(encoding: files), timeout: limits.request)
+    }
+
     /// Tells the add-on what the person picked in its picker (`ledge.picked`, LedgeKit 0.19.0).
     public func picked(_ item: PickedItem) async throws {
         guard state == .running else { throw AddOnRuntimeError.notRunning }

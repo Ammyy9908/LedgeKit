@@ -26,6 +26,7 @@ ledgekit \(SessionProtocol.release): build Ledge add-ons
         {"end": "body", "text": "…"}  {"toggle": "sounds", "to": true}  {"pick": "units", "value": "c"}  {"change": "volume", "value": 0.5}
         {"tool": "add_note", "arguments": {"text": "…"}}: an AI app's call, arguments checked as Ledge checks them
         {"picked": "heart", "section": "recents"}: the person picks an item from the add-on's picker
+        {"share": ["/path/a.png"], "destination": "pixel"}: the person shares files from the shelf, or drops them on a row
         {"type": "ls\\n"}: typed into the add-on's terminal (a newline is Return); the report's terminal.output has the screen
       With no script it waits, shows every declared surface, waits, then hides them.
       --deny turns capabilities off, as a person can in Ledge: calls that need them are refused, which isn't a
