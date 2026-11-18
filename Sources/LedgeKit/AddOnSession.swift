@@ -184,6 +184,13 @@ public enum AddOnSession {
         update(topic: Surface.shareTargetTopic, payload: payload)
     }
 
+    /// Offers the add-on's actions on keyboard shortcuts, replacing the last ones; an empty list takes them away.
+    /// Declare `shortcut` in the manifest. The person picks the keys in Settings. Needs 0.22.0.
+    public static func show(shortcuts: [AddOnShortcut]) {
+        guard let payload = try? JSONValue(encoding: shortcuts) else { return }
+        update(topic: Surface.shortcutsTopic, payload: payload)
+    }
+
     public static func show(picker: Picker?) {
         guard let payload = try? JSONValue(encoding: picker) else { return }
         update(topic: Surface.pickerTopic, payload: payload)

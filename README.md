@@ -77,7 +77,12 @@ handlers.onEvent = { event in
 ```
 
 - Settings rows: toggle, picker, slider, text field, button, link, read-only value, note. Widgets: vertical and
-  horizontal stacks, text, SF Symbols, a progress bar, buttons and spacers.
+  horizontal stacks, text, SF Symbols, a progress bar, buttons and spacers. From 0.22.0, widgets and pages also take
+  `.slider(id:value:maximum:label:image:)`, a bar row that reports `.changed(value)` (`maximum` up to 4, so 200% is
+  `maximum: 2`), and widgets take `.image(png, size:)`.
+- Keyboard shortcuts (0.22.0): declare the `shortcut` surface and send up to 4 with
+  `AddOnSession.show(shortcuts: [AddOnShortcut("mute", title: "Mute microphones", key: "M")])`. People pick the
+  modifier keys in Settings; a press arrives as `.pressed` on `Surface.shortcut` with the shortcut's id.
 - Each send replaces the last. Ledge keeps controls whose ids don't change, so a field being typed in isn't reset.
 - Ledge draws only surfaces the manifest declares, and refuses descriptions over its limits (200 rows, 8 widgets,
   100 parts and 6 levels per widget, 1,000 characters per text).

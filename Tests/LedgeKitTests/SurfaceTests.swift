@@ -205,3 +205,37 @@ func everyWidgetSizeRoundTrips(size: Widget.Size) throws {
     let deep = (0..<10).reduce(WidgetNode.spacer) { node, _ in .vstack(spacing: nil, children: [node]) }
     #expect(throws: (any Error).self) { try Widget("w", title: "W", symbol: "x", content: .spacer, compactContent: deep).validate() }
 }
+
+@Test func widgetSlidersAndImagesRoundTripAndAreChecked() throws {
+    let row = WidgetNode.hstack(spacing: 8, children: [.image(Data([0x89, 0x50]), size: 18), .slider(id: "music", value: 0.4, maximum: nil, label: "Music", image: nil)])
+    let widget = Widget("mixer", title: "Mixer", symbol: "slider.horizontal.3", content: row)
+    try widget.validate()
+    #expect(try JSONDecoder().decode(Widget.self, from: JSONEncoder().encode(widget)) == widget)
+    #expect(widget.content.needsSliderOrImage)
+    #expect(throws: (any Error).self) { try Widget("w", title: "W", symbol: "x", content: .slider(id: "a", value: 1.5, maximum: nil, label: nil, image: nil)).validate() }
+    #expect(throws: (any Error).self) {
+        try Widget("w", title: "W", symbol: "x", content: .vstack(spacing: nil, children: [.slider(id: "a", value: 0, maximum: nil, label: nil, image: nil), .slider(id: "a", value: 0, maximum: nil, label: nil, image: nil)])).validate()
+    }
+    #expect(throws: (any Error).self) { try Widget("w", title: "W", symbol: "x", content: .image(Data(count: 40_000), size: nil)).validate() }
+}
+
+@Test func pageSlidersAreCheckedAndNeedTheirRelease() throws {
+    let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    let row = PageNode.vstack(spacing: 6, children: [.slider(id: "music", value: 1.6, maximum: 2, label: "Music", image: png)])
+    try PageScreen("main", content: row).validate()
+    #expect(row.hasSlider)
+    #expect(throws: (any Error).self) { try PageScreen("main", content: .slider(id: "a", value: 2.5, maximum: 2, label: nil, image: nil)).validate() }
+    #expect(throws: (any Error).self) { try PageScreen("main", content: .slider(id: "a", value: 0, maximum: 0.5, label: nil, image: nil)).validate() }
+    #expect(throws: (any Error).self) { try PageScreen("main", content: .slider(id: "a", value: 0.5, maximum: nil, label: nil, image: Data([1, 2]))).validate() }
+    #expect(throws: (any Error).self) {
+        try PageScreen("main", content: .vstack(spacing: nil, children: [.button(id: "a", title: "A", symbol: nil), .slider(id: "a", value: 0, maximum: nil, label: nil, image: nil)])).validate()
+    }
+}
+
+@Test func shortcutsAreChecked() throws {
+    let list = [AddOnShortcut("mute", title: "Mute microphones", key: "M")]
+    try AddOnShortcut.validate(list)
+    #expect(throws: (any Error).self) { try AddOnShortcut.validate([AddOnShortcut("a", title: "A", key: "m")]) }
+    #expect(throws: (any Error).self) { try AddOnShortcut.validate([AddOnShortcut("a", title: "A", key: "MM")]) }
+    #expect(throws: (any Error).self) { try AddOnShortcut.validate(list + list) }
+}

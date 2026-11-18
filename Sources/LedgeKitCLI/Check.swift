@@ -493,6 +493,7 @@ private final class CheckReport: @unchecked Sendable {
             needs("0.12.0", "A notch page")
             if page?.screen.content.listRows.contains(where: { $0.acceptsFiles == true }) == true { needs("0.20.0", "A list row that takes files") }
             if page?.screen.content.hasImage == true { needs("0.21.0", "An image on a page") }
+            if page?.screen.content.hasSlider == true { needs("0.22.0", "A slider on a page") }
         case .activities(let list)?:
             if list.contains(where: { $0.kind != nil || $0.accessibilityValue != nil || $0.importance == .attention }) {
                 needs("0.13.0", "An activity's kind, accessibilityValue or .attention")
@@ -505,10 +506,14 @@ private final class CheckReport: @unchecked Sendable {
         case .widgets(let list)?:
             if list.contains(where: { $0.size != .small }) { needs("0.15.0", "A medium or large widget") }
             if list.contains(where: { $0.compactContent != nil }) { needs("0.17.0", "A widget's compactContent") }
+            if list.contains(where: { $0.content.needsSliderOrImage || $0.compactContent?.needsSliderOrImage == true }) {
+                needs("0.22.0", "A slider or image in a widget")
+            }
         case .tools?: needs("0.16.0", "Tools for AI apps")
         case .terminalOutput?, .terminalState?: needs("0.18.0", "A terminal")
         case .picker?: needs("0.19.0", "A picker")
         case .shareTarget?: needs("0.20.0", "A share target")
+        case .shortcuts?: needs("0.22.0", "Shortcuts")
         default: break
         }
     }

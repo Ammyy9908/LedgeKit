@@ -538,6 +538,16 @@ public indirect enum WidgetNode: Codable, Sendable, Equatable {
     /// Sends a `pressed` event with this id.
     case button(id: String, title: String, symbol: String?)
     case spacer
+    /// A slider from 0 to `maximum` (1 if nil, at most 4) that fills the width it's given. Sends `changed` with its
+    /// id as it moves, so it can drive something live, like a volume; Ledge keeps it where the person left it, so
+    /// there's no need to send the widget again for each move. With a `label` it's drawn as a row that fills to its
+    /// level, the label and `image` (a PNG icon, up to ``Surface/maximumPageImageBytes``) on it and the value as a
+    /// percent at its end; without one, as a thin track. A `maximum` over 1 marks 1 (100%) with a line, colours
+    /// the fill past it and snaps to it, for a boost like 200%. Needs 0.22.0.
+    case slider(id: String, value: Double, maximum: Double?, label: String?, image: Data?)
+    /// A small picture carried in the widget: PNG bytes, up to ``Surface/maximumPageImageBytes``, drawn `size` points
+    /// square (12 to 64, 18 if nil), like an app's icon beside its row. Needs 0.22.0.
+    case image(Data, size: Double?)
 
     public enum TextStyle: String, Codable, Sendable {
         case title, body, caption, secondary, monospaced
@@ -647,6 +657,9 @@ public indirect enum PageNode: Codable, Sendable, Equatable {
     /// drawn `size` points square (16 to 128, 24 if nil). `motion` moves it, such as `.shake` while something works;
     /// Ledge keeps it still when the person turned on Reduce motion. Needs 0.21.0.
     case image(Data, size: Double?, motion: Motion?)
+    /// A slider, as on a widget: see ``WidgetNode/slider(id:value:maximum:label:image:)``. Sends `changed` with its
+    /// id. Needs 0.22.0.
+    case slider(id: String, value: Double, maximum: Double?, label: String?, image: Data?)
 
     public enum Motion: String, Codable, Sendable {
         /// A little side-to-side shake, over and over.
@@ -803,6 +816,12 @@ extension Widget {
             case let .button(id, title, _):
                 guard ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 try checkText(title)
+            case let .slider(id, value, maximum, label, image):
+                guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                try checkSlider(id, value: value, maximum: maximum, label: label, image: image)
+            case let .image(data, size):
+                guard data.count <= Surface.maximumPageImageBytes else { throw SurfaceValidationError.tooLarge("image over \(Surface.maximumPageImageBytes) bytes") }
+                if let size, !(12...64).contains(size) { throw SurfaceValidationError.invalid("image size \(size)") }
             case .symbol, .spacer:
                 break
             }
@@ -877,6 +896,9 @@ extension PageScreen {
                 guard data.count <= Surface.maximumPageImageBytes else { throw SurfaceValidationError.tooLarge("image over \(Surface.maximumPageImageBytes) bytes") }
                 guard data.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) else { throw SurfaceValidationError.invalid("image that isn't a PNG") }
                 guard (16...128).contains(size ?? 24) else { throw SurfaceValidationError.invalid("image size \(size ?? 24)") }
+            case let .slider(id, value, maximum, label, image):
+                guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                try checkSlider(id, value: value, maximum: maximum, label: label, image: image)
             case let .editor(id, text, placeholder, _):
                 guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 editors += 1
@@ -972,4 +994,15 @@ extension LiveActivity {
 
 private func checkText(_ text: String?) throws {
     if let text, text.count > Surface.maximumText { throw SurfaceValidationError.tooLarge("text over \(Surface.maximumText) characters") }
+}
+
+private func checkSlider(_ id: String, value: Double, maximum: Double?, label: String?, image: Data?) throws {
+    let top = maximum ?? 1
+    guard (1...4).contains(top) else { throw SurfaceValidationError.invalid("slider \(id) maximum \(top)") }
+    guard (0...top).contains(value) else { throw SurfaceValidationError.invalid("slider \(id) value \(value)") }
+    try checkText(label)
+    if let image {
+        guard image.count <= Surface.maximumPageImageBytes else { throw SurfaceValidationError.tooLarge("image over \(Surface.maximumPageImageBytes) bytes") }
+        guard image.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) else { throw SurfaceValidationError.invalid("image that isn't a PNG") }
+    }
 }
