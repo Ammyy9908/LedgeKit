@@ -24,6 +24,7 @@ public enum SurfaceUpdate: Sendable, Equatable {
     case picker(Picker?)
     /// Nil takes it away.
     case shareTarget(ShareTarget?)
+    case shortcuts([AddOnShortcut])
 
     /// The surface name the topic belongs to, as `addon.json` lists it; nil for a topic Ledge doesn't know.
     public static func surface(forTopic topic: String) -> String? {
@@ -40,6 +41,7 @@ public enum SurfaceUpdate: Sendable, Equatable {
         case Surface.terminalOutputTopic, Surface.terminalStateTopic: Surface.terminal
         case Surface.pickerTopic: Surface.picker
         case Surface.shareTargetTopic: Surface.shareTarget
+        case Surface.shortcutsTopic: Surface.shortcut
         default: nil
         }
     }
@@ -91,6 +93,10 @@ public enum SurfaceUpdate: Sendable, Equatable {
             let target = payload == .null ? nil : try payload.decode(ShareTarget.self)
             try target?.validate()
             return .shareTarget(target)
+        case Surface.shortcutsTopic:
+            let list = try payload.decode([AddOnShortcut].self)
+            try AddOnShortcut.validate(list)
+            return .shortcuts(list)
         case Surface.terminalOutputTopic:
             let output = try payload.decode(TerminalOutput.self)
             try output.validate()

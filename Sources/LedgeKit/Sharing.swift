@@ -146,11 +146,31 @@ extension PageNode {
         }
     }
 
+    /// Whether a slider is anywhere in it, which needs 0.22.0.
+    public var hasSlider: Bool {
+        switch self {
+        case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.hasSlider)
+        case .slider: true
+        default: false
+        }
+    }
+
     /// Whether an image is anywhere in it, which needs 0.21.0.
     public var hasImage: Bool {
         switch self {
         case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.hasImage)
         case .image: true
+        default: false
+        }
+    }
+}
+
+extension WidgetNode {
+    /// Whether a slider or an image is anywhere in it, which needs 0.22.0.
+    public var needsSliderOrImage: Bool {
+        switch self {
+        case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.needsSliderOrImage)
+        case .slider, .image: true
         default: false
         }
     }
