@@ -4,6 +4,25 @@ LedgeKit is the Swift package for authoring Ledge add-ons. It currently supports
 the version-1, one-request executable transport used by Spotify Likes.
 Requires Swift 6 and macOS 14 or later.
 
+## Native page controls (0.23.0)
+
+`PageNode.control(PageButton)` provides host-rendered normal, secondary, accent and selected button roles,
+including labeled SF Symbol controls. `buttonGrid(columns:rowHeight:buttons:)` draws equal-width columns,
+with 1–10 columns, complete rows, at most 60 buttons and row heights of 24–44 points. Button IDs are unique
+across the screen, including existing controls. Each button contributes to the page-node limit.
+
+`PageNode.readout(PageReadout)` displays an editable expression and a large right-aligned value. Editing sends
+`edited`/`ended` with the readout ID; Return sends `pressed` with that ID. Clicking the value sends `pressed`
+with `copyControl`. These two IDs must differ. Expression/value limits are 512/80 characters. The host owns
+focus and preserves the field editor when the value updates. Keyboard input is local to the focused page.
+
+`NotchPage.preferredWidth` optionally requests 320–800 points. The host respects a larger user-selected width
+and clamps the result to the display. Existing pages omit it and keep their existing layout and wire format.
+These new controls and width requests require `kit.minAPI` 0.23.0; older hosts reject the manifest before drawing.
+Pin the public 0.23.0 release to use these controls; the Ledge host must also support API 0.23.0.
+`ListRow.emphasizesSubtitle` optionally draws the title as a small label above a prominent subtitle value.
+Existing rows omit it and retain their current appearance.
+
 ## Add the library
 
 During development, place your add-on beside a LedgeKit checkout and declare:
