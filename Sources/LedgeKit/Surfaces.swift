@@ -568,12 +568,16 @@ public struct NotchPage: Codable, Sendable, Equatable {
     public var size: Size
     /// What the page shows now. Send a new screen to move to it.
     public var screen: PageScreen
+    /// Optional open width in points, 320...800. The host keeps it on screen and never narrows the user's size.
+    /// Nil preserves the standard width. Needs 0.23.0.
+    public var preferredWidth: Double?
 
-    public init(title: String, symbol: String, size: Size = .medium, screen: PageScreen) {
+    public init(title: String, symbol: String, size: Size = .medium, preferredWidth: Double? = nil, screen: PageScreen) {
         self.title = title
         self.symbol = symbol
         self.size = size
         self.screen = screen
+        self.preferredWidth = preferredWidth
     }
 
     public enum Size: String, Codable, Sendable {
@@ -634,6 +638,12 @@ public struct PageAction: Codable, Sendable, Equatable {
 
 /// What a notch page's screen is made of: a widget's parts, plus a list, an empty state and a text editor.
 public indirect enum PageNode: Codable, Sendable, Equatable {
+    /// A native button with a semantic appearance. Needs 0.23.0.
+    case control(PageButton)
+    /// Equal columns of native buttons, 1...10 columns and at most 60 buttons; 24...44 point rows. Needs 0.23.0.
+    case buttonGrid(columns: Int, rowHeight: Double, buttons: [PageButton])
+    /// A large, right-aligned value with an editable expression above it. Needs 0.23.0.
+    case readout(PageReadout)
     case vstack(spacing: Double?, children: [PageNode])
     case hstack(spacing: Double?, children: [PageNode])
     case text(String, style: WidgetNode.TextStyle?)
@@ -680,15 +690,19 @@ public struct ListRow: Codable, Sendable, Equatable {
     /// Files dropped on the row go to `AddOnHandlers.onShare`, with the row's id as the destination (LedgeKit
     /// 0.20.0). Needs the `shared-files` capability; without it, or in an older Ledge, the row takes no drops.
     public var acceptsFiles: Bool?
+    /// Makes the subtitle the prominent value and the title its small label, for receipts or result histories.
+    /// Nil retains the existing row style. Needs 0.23.0.
+    public var emphasizesSubtitle: Bool?
 
     public init(_ id: String, title: String, subtitle: String? = nil, detail: String? = nil, symbol: String? = nil,
-                acceptsFiles: Bool = false) {
+                acceptsFiles: Bool = false, emphasizesSubtitle: Bool = false) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.detail = detail
         self.symbol = symbol
         self.acceptsFiles = acceptsFiles ? true : nil
+        self.emphasizesSubtitle = emphasizesSubtitle ? true : nil
     }
 }
 
@@ -841,6 +855,9 @@ extension NotchPage {
     public func validate() throws {
         guard !title.isEmpty, title.count <= 40 else { throw SurfaceValidationError.invalid("notch page title") }
         guard !symbol.isEmpty, symbol.count <= 100 else { throw SurfaceValidationError.invalid("notch page symbol") }
+        if let preferredWidth {
+            guard preferredWidth.isFinite, (320...800).contains(preferredWidth) else { throw SurfaceValidationError.invalid("notch page width") }
+        }
         try screen.validate()
     }
 }
@@ -867,6 +884,20 @@ extension PageScreen {
             guard depth <= Surface.maximumDepth else { throw SurfaceValidationError.tooLarge("nesting deeper than \(Surface.maximumDepth)") }
             guard count <= Surface.maximumPageNodes else { throw SurfaceValidationError.tooLarge("more than \(Surface.maximumPageNodes) parts") }
             switch node {
+            case .control(let button):
+                try button.validate(ids: &ids)
+            case let .buttonGrid(columns, rowHeight, buttons):
+                guard (1...10).contains(columns), !buttons.isEmpty, buttons.count <= 60,
+                      buttons.count % max(columns, 1) == 0, rowHeight.isFinite, (24...44).contains(rowHeight)
+                else { throw SurfaceValidationError.invalid("button grid dimensions") }
+                count += buttons.count
+                guard count <= Surface.maximumPageNodes else { throw SurfaceValidationError.tooLarge("page buttons") }
+                for button in buttons { try button.validate(ids: &ids) }
+            case .readout(let readout):
+                for id in [readout.id, readout.copyControl] {
+                    guard !id.isEmpty, id.count <= 128, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                }
+                guard readout.expression.count <= 512, !readout.value.isEmpty, readout.value.count <= 80, (readout.status?.count ?? 0) <= 120 else { throw SurfaceValidationError.invalid("readout text") }
             case let .vstack(_, children), let .hstack(_, children):
                 for child in children { try walk(child, depth: depth + 1) }
             case let .text(text, _):

@@ -494,6 +494,7 @@ private final class CheckReport: @unchecked Sendable {
             if page?.screen.content.listRows.contains(where: { $0.acceptsFiles == true }) == true { needs("0.20.0", "A list row that takes files") }
             if page?.screen.content.hasImage == true { needs("0.21.0", "An image on a page") }
             if page?.screen.content.hasSlider == true { needs("0.22.0", "A slider on a page") }
+            if page?.screen.content.hasNativeControls == true || page?.preferredWidth != nil { needs("0.23.0", "Native page controls or preferred width") }
         case .activities(let list)?:
             if list.contains(where: { $0.kind != nil || $0.accessibilityValue != nil || $0.importance == .attention }) {
                 needs("0.13.0", "An activity's kind, accessibilityValue or .attention")
