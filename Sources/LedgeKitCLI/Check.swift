@@ -241,6 +241,16 @@ private final class SimulatedHost: @unchecked Sendable {
         let recent = lock.withLock { Date().timeIntervalSince(lastAction) < 2 }
 
         switch method {
+        case LedgeHost.Method.configureTranslation, LedgeHost.Method.translateSelection:
+            needs("0.24.0", "Selection translation")
+            try require(SelectionTranslation.capability)
+            if method == LedgeHost.Method.configureTranslation {
+                if let value = object["options"], value != .null { try value.decode(SelectionTranslation.self).validate() }
+            } else if !recent {
+                throw CLIError("Translate only just after the user uses the add-on.")
+            }
+            report.call(method, detail: "Ledge owns the selection and on-device translation card; no text is read in a check")
+            return .bool(true)
         case LedgeHost.Method.settingsGet:
             report.call(method)
             return lock.withLock { string("key").flatMap { settings[$0] } ?? .null }
