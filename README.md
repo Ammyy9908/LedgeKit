@@ -4,6 +4,22 @@ LedgeKit is the Swift package for authoring Ledge add-ons. It currently supports
 the version-1, one-request executable transport used by Spotify Likes.
 Requires Swift 6 and macOS 14 or later.
 
+## Selection translation (0.24.0)
+
+Configure Ledge's on-device translator with
+`LedgeHost.configureTranslation(SelectionTranslation(target: "en", secondary: "es"))`
+and call `LedgeHost.translateSelection()` from an explicit shortcut action.
+Declare `selection-translation` and require API 0.24.0 and macOS 15. Ledge owns
+Accessibility access, the floating card, Apple Translation language downloads,
+Copy and safe Replace. Selected and translated text never reach the add-on.
+Configure with nil to disable; session stop or capability revocation clears state.
+The optional `selectionButton` is off by default and requires user opt-in.
+
+Calls are refused without the capability, without Accessibility for selection
+access, for secure or oversized selections, or without a recent user action.
+Translation errors and unsupported pairs appear in the card. Text is never sent
+to an online translation service.
+
 ## Native page controls (0.23.0)
 
 `PageNode.control(PageButton)` provides host-rendered normal, secondary, accent and selected button roles,
