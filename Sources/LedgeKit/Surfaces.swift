@@ -10,6 +10,9 @@ import Foundation
 public enum Surface {
     public static let settingsPage = "settings-page"
     public static let widget = "widget"
+    /// The add-on's widget as a tile in the Ledge iPhone app, in the group the manifest's `iphone.group` names.
+    /// Taps on it arrive as the same events the widget sends on the Mac.
+    public static let iphone = "iphone"
     /// A button in Ledge's players, such as a heart for liking the playing song.
     public static let playerAction = "player-action"
     /// A ••• menu entry and Playing Next in Ledge's players, for the players an add-on covers.

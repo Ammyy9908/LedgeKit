@@ -120,3 +120,26 @@ private func v2(_ extra: [String: Any]) throws -> AddOnManifest {
     #expect(AddOnManifest.compare("1.0", "1.0.0") == .orderedSame)
     #expect(AddOnManifest.compare("1.2.3", "1.2.4") == .orderedAscending)
 }
+
+private func iphoneManifest(surfaces: [String], iphone: [String: String]?) throws -> AddOnManifest {
+    var object: [String: Any] = [
+        "id": "audio-control", "version": "1.0.0", "protocolVersion": 2, "name": "Audio Control",
+        "summary": "Volume", "description": "Volume per app", "author": "Ledge", "capabilities": [],
+        "executable": "AudioControl", "surfaces": surfaces
+    ]
+    object["iphone"] = iphone
+    return try JSONDecoder().decode(AddOnManifest.self, from: JSONSerialization.data(withJSONObject: object))
+}
+
+@Test func acceptsIPhoneWidgetWithGroup() throws {
+    let value = try iphoneManifest(surfaces: ["widget", "iphone"], iphone: ["group": "mac-controls"])
+    try value.validate()
+    #expect(value.iphone?.group == "mac-controls")
+}
+
+@Test func rejectsIPhoneWithoutWidgetOrGroup() throws {
+    let noWidget = try iphoneManifest(surfaces: ["iphone"], iphone: ["group": "focus"])
+    #expect(throws: (any Error).self) { try noWidget.validate() }
+    let noGroup = try iphoneManifest(surfaces: ["widget", "iphone"], iphone: nil)
+    #expect(throws: (any Error).self) { try noGroup.validate() }
+}
