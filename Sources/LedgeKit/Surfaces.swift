@@ -673,6 +673,12 @@ public indirect enum PageNode: Codable, Sendable, Equatable {
     /// A slider, as on a widget: see ``WidgetNode/slider(id:value:maximum:label:image:)``. Sends `changed` with its
     /// id. Needs 0.22.0.
     case slider(id: String, value: Double, maximum: Double?, label: String?, image: Data?)
+    /// A ruler of whole numbers dragged under a centre pointer; see ``PageTape``. It runs the page's whole width.
+    /// Needs 0.26.0.
+    case tape(PageTape)
+    /// A large value, such as a timer's "24:59", in 30 point digits that roll as they change, in `tint` (nil is
+    /// white). At most 20 characters. Needs 0.26.0.
+    case display(String, tint: PageTint?)
 
     public enum Motion: String, Codable, Sendable {
         /// A little side-to-side shake, over and over.
@@ -933,6 +939,13 @@ extension PageScreen {
             case let .slider(id, value, maximum, label, image):
                 guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 try checkSlider(id, value: value, maximum: maximum, label: label, image: image)
+            case .tape(let tape):
+                guard !tape.id.isEmpty, tape.id.count <= 128, ids.insert(tape.id).inserted else { throw SurfaceValidationError.duplicateID(tape.id) }
+                guard tape.minimum < tape.maximum, tape.maximum - tape.minimum <= 100_000, (tape.minimum...tape.maximum).contains(tape.value),
+                      (1...1000).contains(tape.labelEvery), !tape.accessibilityLabel.isEmpty, tape.accessibilityLabel.count <= 80
+                else { throw SurfaceValidationError.invalid("tape \(tape.id)") }
+            case let .display(text, _):
+                guard !text.isEmpty, text.count <= 20 else { throw SurfaceValidationError.invalid("display text") }
             case let .editor(id, text, placeholder, _):
                 guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 editors += 1

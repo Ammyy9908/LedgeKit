@@ -32,3 +32,31 @@ import Testing
     page.preferredWidth = 10
     #expect(throws: (any Error).self) { try page.validate() }
 }
+
+@Test func tapesDisplaysAndTintsRoundTripAndNeed026() throws {
+    let node = PageNode.vstack(spacing: 8, children: [
+        .control(PageButton("focus", title: "Focus", role: .selected, tint: .blue)),
+        .tape(PageTape("length", value: 25, minimum: 1, maximum: 480, tint: .blue, accessibilityLabel: "Length in minutes")),
+        .display("25:00", tint: .blue),
+    ])
+    try PageScreen("main", content: node).validate()
+    #expect(try JSONDecoder().decode(PageNode.self, from: JSONEncoder().encode(node)) == node)
+    #expect(node.needsTapeOrTint)
+    #expect(!PageNode.control(PageButton("a", title: "A", role: .accent)).needsTapeOrTint)
+    // A 0.23 button, without a tint, still decodes.
+    let old = #"{"id":"a","title":"A","role":"accent"}"#
+    #expect(try JSONDecoder().decode(PageButton.self, from: Data(old.utf8)).tint == nil)
+}
+
+@Test func malformedTapesAndDisplaysAreRejected() {
+    for node in [PageNode.tape(PageTape("t", value: 0, minimum: 1, maximum: 10, accessibilityLabel: "Length")),
+                 .tape(PageTape("t", value: 5, minimum: 10, maximum: 10, accessibilityLabel: "Length")),
+                 .tape(PageTape("t", value: 5, minimum: 1, maximum: 10, labelEvery: 0, accessibilityLabel: "Length")),
+                 .tape(PageTape("t", value: 5, minimum: 1, maximum: 10, accessibilityLabel: "")),
+                 .hstack(spacing: nil, children: [.tape(PageTape("t", value: 5, minimum: 1, maximum: 10, accessibilityLabel: "L")),
+                                                  .control(PageButton("t", title: "Again"))]),
+                 .display("", tint: nil),
+                 .display(String(repeating: "9", count: 21), tint: nil)] {
+        #expect(throws: (any Error).self) { try PageScreen("main", content: node).validate() }
+    }
+}
