@@ -39,6 +39,20 @@ Pin the public 0.23.0 release to use these controls; the Ledge host must also su
 `ListRow.emphasizesSubtitle` optionally draws the title as a small label above a prominent subtitle value.
 Existing rows omit it and retain their current appearance.
 
+## Tapes, displays and tints (0.26.0)
+
+`PageNode.tape(PageTape)` draws a ruler of whole numbers under a fixed centre pointer, with a tick per number and a
+longer, labelled tick every `labelEvery`. Dragging or scrolling it sideways sends `changed` with each whole number it
+passes; Ledge owns the drag, so it keeps moving while the add-on answers. The value must lie within
+`minimum...maximum` (a span of at most 100,000), `labelEvery` is 1–1,000, and the ID shares the screen's ID space.
+A tape runs the page's full width.
+
+`PageNode.display(_:tint:)` shows a value of up to 20 characters in large 30 point digits that roll as they change.
+
+`PageButton.tint` and `PageTape.tint` take a `PageTint` (orange, blue, green, purple, pink, red or yellow) for an
+accent or selected button and the tape's pointer. Nil keeps Ledge's accent, and older add-ons' buttons decode
+unchanged. All three need `kit.minAPI` 0.26.0; `ledgekit check` says so when a page uses them.
+
 ## Add the library
 
 During development, place your add-on beside a LedgeKit checkout and declare:
