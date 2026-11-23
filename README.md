@@ -232,6 +232,27 @@ handlers.onEvent = { event in
   characters, value up to 20), shown under the clock only while the Mac is locked; up to two menu bar tiles, as rows
   under Ledge's own in its menu bar panel.
 
+## On iPhone (0.25.0)
+
+Declare `"iphone"` beside `"widget"` and name a group, and the Ledge iPhone app shows your widget as a tile in its
+Droplets tab, with no iPhone code of your own:
+
+```json
+"surfaces": ["widget", "iphone"],
+"iphone": { "group": "mac-controls" }
+```
+
+- Groups, in the order the app shows them: `mac-controls` (runs on the Mac, controlled from the phone), `focus`,
+  `glance` (status to read at a glance) and `notes`. A group the app doesn't know goes under More.
+- The tile draws the widget's `compactContent` when it has one, about 168 points wide like a paired widget, and its
+  `content` otherwise.
+- Tapping the tile's header opens a large view with your notch page, or the full widget when you have no page, so
+  rows that don't fit the tile are still reachable. It follows what you send while it's open.
+- Buttons, sliders, lists, editors and header actions send the same events as on the Mac. Ledge forwards only
+  controls in the widget or page screen it last received from you.
+- The tile shows "Mac offline" while the phone isn't connected. Older Ledge versions ignore the `iphone` surface and
+  field, so declaring them doesn't need a higher `kit.minAPI`.
+
 ## A page in the notch (0.12.0)
 
 ```swift

@@ -36,6 +36,18 @@ public struct AddOnManifest: Codable, Sendable, Equatable {
     public let source: Source?
     /// Search words beyond the name and summary.
     public let keywords: [String]?
+    /// Where the add-on's widget shows in the Ledge iPhone app. Needs the `iphone` surface.
+    public let iphone: IPhone?
+
+    /// An add-on on iPhone: its `widget`, drawn as a tile in one of the Droplets groups.
+    public struct IPhone: Codable, Sendable, Equatable {
+        /// One of ``groups``. The iPhone app puts a group it doesn't know under More.
+        public let group: String
+        public init(group: String) { self.group = group }
+
+        /// The Droplets groups, in the order the iPhone app shows them.
+        public static let groups = ["mac-controls", "focus", "glance", "notes"]
+    }
 
     public struct Kit: Codable, Sendable, Equatable {
         public let minAPI: String
@@ -68,7 +80,8 @@ public struct AddOnManifest: Codable, Sendable, Equatable {
                 name: String, summary: String, description: String, author: String,
                 capabilities: [String], icon: String? = nil, executable: String,
                 surfaces: [String]? = nil, kit: Kit? = nil, minLedge: String? = nil, minMacOS: String? = nil,
-                category: String? = nil, creator: Creator? = nil, source: Source? = nil, keywords: [String]? = nil) {
+                category: String? = nil, creator: Creator? = nil, source: Source? = nil, keywords: [String]? = nil,
+                iphone: IPhone? = nil) {
         self.id = id
         self.version = version
         self.protocolVersion = protocolVersion
@@ -87,6 +100,7 @@ public struct AddOnManifest: Codable, Sendable, Equatable {
         self.creator = creator
         self.source = source
         self.keywords = keywords
+        self.iphone = iphone
     }
 
     /// Checks metadata only. Package file checks and user trust belong to the host.
@@ -123,6 +137,13 @@ public struct AddOnManifest: Codable, Sendable, Equatable {
         // A share target hands the add-on the person's files, so it can't come without the capability they approve.
         if surfaces?.contains(Surface.shareTarget) == true, !capabilities.contains(Surface.sharedFilesCapability) {
             throw ManifestValidationError.invalidField("capabilities: the share-target surface needs the shared-files capability")
+        }
+        // The iPhone tile is the add-on's widget, so it can't come without one, and a group says where it goes.
+        if surfaces?.contains(Surface.iphone) == true {
+            guard surfaces?.contains(Surface.widget) == true
+            else { throw ManifestValidationError.invalidField("surfaces: the iphone surface needs the widget surface") }
+            guard let group = iphone?.group, AddOnCapability.isWellFormed(group)
+            else { throw ManifestValidationError.invalidField("iphone.group") }
         }
         for (field, value) in [("kit.minAPI", kit?.minAPI), ("minLedge", minLedge)] {
             if let value, !Self.isReleaseVersion(value) { throw ManifestValidationError.invalidField(field) }
