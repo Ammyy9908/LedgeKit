@@ -709,6 +709,10 @@ public indirect enum PageNode: Codable, Sendable, Equatable {
     case display(String, tint: PageTint?)
     /// A ring filled part of the way round a picture or symbol; see ``PageRing``. Needs 0.27.0.
     case ring(PageRing)
+    /// Text after a small tinted symbol; see ``PageLabel``. Needs 0.27.0.
+    case label(PageLabel)
+    /// A rounded, slightly lighter box around its content, such as the command an agent is running. Needs 0.27.0.
+    case panel(PageNode)
 
     public enum Motion: String, Codable, Sendable {
         /// A little side-to-side shake, over and over.
@@ -977,6 +981,9 @@ extension PageScreen {
             case let .display(text, _):
                 guard !text.isEmpty, text.count <= 20 else { throw SurfaceValidationError.invalid("display text") }
             case .ring(let ring):
+                if let id = ring.id {
+                    guard !id.isEmpty, id.count <= 128, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                }
                 guard ring.value.map({ (0...1).contains($0) }) ?? true, !ring.title.isEmpty, ring.title.count <= 30,
                       (ring.caption?.count ?? 0) <= 30, !ring.accessibilityLabel.isEmpty, ring.accessibilityLabel.count <= 120,
                       (ring.symbol?.count ?? 0) <= 100
@@ -985,6 +992,11 @@ extension PageScreen {
                     guard image.count <= Surface.maximumPageImageBytes else { throw SurfaceValidationError.tooLarge("ring image over \(Surface.maximumPageImageBytes) bytes") }
                     guard image.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) else { throw SurfaceValidationError.invalid("ring image that isn't a PNG") }
                 }
+            case .label(let label):
+                guard !label.text.isEmpty, label.text.count <= 200, (label.symbol?.count ?? 0) <= 100
+                else { throw SurfaceValidationError.invalid("label") }
+            case .panel(let child):
+                try walk(child, depth: depth + 1)
             case let .editor(id, text, placeholder, _):
                 guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 editors += 1
