@@ -353,10 +353,20 @@ public struct LiveActivity: Codable, Sendable, Equatable {
     /// A small PNG (up to 64 KB) that stands for the activity when its text is empty, like an agent's mascot, in place
     /// of the add-on's icon. While the progress is indeterminate Ledge makes it dance. Needs 0.21.0.
     public var image: Data?
+    /// Something the person follows live, like a coding agent at work. While it's up, opening the notch shows the
+    /// add-on's page on Home in place of the widgets, and closed, the activity takes the notch from the song playing,
+    /// which moves beside it. One add-on leads at a time, the one whose activity ranks highest, and the person can turn
+    /// it off in Ledge's settings. Needs the `"notch-page"` surface. Older Ledges ignore it. Needs 0.27.0.
+    public var leadsHome: Bool {
+        get { storedLeadsHome ?? false }
+        set { storedLeadsHome = newValue ? true : nil }
+    }
+    /// Nil for false, so an activity that doesn't lead sends exactly what it did before 0.27.0.
+    private var storedLeadsHome: Bool?
 
     public init(_ id: String, symbol: String, text: String, progress: Progress? = nil,
                 importance: Importance = .normal, lasts: Double? = nil, kind: Kind? = nil, accessibilityValue: String? = nil,
-                image: Data? = nil) {
+                image: Data? = nil, leadsHome: Bool = false) {
         self.id = id
         self.symbol = symbol
         self.text = text
@@ -366,6 +376,12 @@ public struct LiveActivity: Codable, Sendable, Equatable {
         self.kind = kind
         self.accessibilityValue = accessibilityValue
         self.image = image
+        self.leadsHome = leadsHome
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, symbol, text, progress, importance, lasts, kind, accessibilityValue, image
+        case storedLeadsHome = "leadsHome"
     }
 
     /// Kinds of activity Ledge has of its own. While Ledge's own of the same kind is up, the add-on's isn't shown,

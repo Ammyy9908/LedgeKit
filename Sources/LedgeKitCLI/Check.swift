@@ -510,6 +510,7 @@ private final class CheckReport: @unchecked Sendable {
             if list.contains(where: { $0.kind != nil || $0.accessibilityValue != nil || $0.importance == .attention }) {
                 needs("0.13.0", "An activity's kind, accessibilityValue or .attention")
             }
+            if list.contains(where: \.leadsHome) { needs("0.27.0", "An activity that leads Home") }
         case .settingsPage(let page)?:
             if page.keywords != nil || page.sections.contains(where: { $0.rows.contains { $0.confirm != nil } }) {
                 needs("0.13.0", "A settings page's keywords or confirmed buttons")

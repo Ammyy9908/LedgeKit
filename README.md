@@ -53,6 +53,14 @@ A tape runs the page's full width.
 accent or selected button and the tape's pointer. Nil keeps Ledge's accent, and older add-ons' buttons decode
 unchanged. All three need `kit.minAPI` 0.26.0; `ledgekit check` says so when a page uses them.
 
+## Activities that lead Home (0.27.0)
+
+`LiveActivity.leadsHome` marks something the person follows live, like a coding agent at work. While it's up,
+opening the notch shows the add-on's page on Home in place of the widgets, and the closed notch shows the activity
+in place of the song playing, which moves beside it. One add-on leads at a time, the one whose activity ranks
+highest, and the person can turn leading off in Ledge's settings. It needs the `"notch-page"` surface and
+`kit.minAPI` 0.27.0, which `ledgekit check` reports. Activities that don't lead encode exactly as before.
+
 ## Add the library
 
 During development, place your add-on beside a LedgeKit checkout and declare:

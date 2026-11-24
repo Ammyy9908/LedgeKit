@@ -118,6 +118,10 @@ private actor Seen {
     #expect(try JSONDecoder().decode([LiveActivity].self, from: JSONEncoder().encode([timer])) == [timer])
     #expect(LiveActivity.Importance.low < .normal && LiveActivity.Importance.normal < .high)
     #expect(throws: (any Error).self) { try LiveActivity.validate([timer, timer]) }
+    // Not leading sends what it did before 0.27.0; leading survives the trip.
+    #expect(!String(decoding: try JSONEncoder().encode(timer), as: UTF8.self).contains("leadsHome"))
+    let leader = LiveActivity("agent", symbol: "sparkle", text: "", progress: .indeterminate, leadsHome: true)
+    #expect(try JSONDecoder().decode(LiveActivity.self, from: JSONEncoder().encode(leader)).leadsHome)
     #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: String(repeating: "x", count: 61))]) }
     #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "y", progress: .fraction(2))]) }
     #expect(throws: (any Error).self) { try LiveActivity.validate([LiveActivity("a", symbol: "x", text: "y", lasts: 0)]) }
