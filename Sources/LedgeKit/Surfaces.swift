@@ -652,17 +652,22 @@ public struct PageAction: Codable, Sendable, Equatable {
         set { storedSelected = newValue ? true : nil }
     }
     private var storedSelected: Bool?
+    /// The button's own colour: its symbol always, and its fill while it's `selected`. Nil is white, lit in Ledge's
+    /// accent. Needs 0.27.0.
+    public var tint: PageTint?
 
-    public init(_ id: String, symbol: String, label: String, destructive: Bool = false, selected: Bool = false) {
+    public init(_ id: String, symbol: String, label: String, destructive: Bool = false, selected: Bool = false,
+                tint: PageTint? = nil) {
         self.id = id
         self.symbol = symbol
         self.label = label
         self.destructive = destructive
         self.storedSelected = selected ? true : nil
+        self.tint = tint
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, symbol, label, destructive
+        case id, symbol, label, destructive, tint
         case storedSelected = "selected"
     }
 }

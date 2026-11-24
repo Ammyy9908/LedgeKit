@@ -74,7 +74,8 @@ details. It needs `kit.minAPI` 0.27.0, which `ledgekit check` reports.
 in a rounded, slightly lighter box, such as the command an agent is running. Both need 0.27.0.
 
 A header button can be `selected`, which draws it lit: give two of them, such as Sessions and Usage, and light the
-one whose view is showing, so they read as a switch. It also needs 0.27.0.
+one whose view is showing, so they read as a switch. A header button's `tint` gives it its own colour: its symbol, and
+its fill while selected. Both need 0.27.0.
 
 ## Add the library
 

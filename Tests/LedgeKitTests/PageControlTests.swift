@@ -103,6 +103,8 @@ import Testing
 @Test func aSelectedHeaderButtonRoundTripsAndOldOnesDecode() throws {
     let action = PageAction("usage", symbol: "gauge", label: "Usage", selected: true)
     #expect(try JSONDecoder().decode(PageAction.self, from: JSONEncoder().encode(action)).selected)
+    let tinted = PageAction("sessions", symbol: "checklist", label: "Sessions", tint: .orange)
+    #expect(try JSONDecoder().decode(PageAction.self, from: JSONEncoder().encode(tinted)) == tinted)
     let old = #"{"id":"a","symbol":"gear","label":"A","destructive":false}"#
     #expect(try !JSONDecoder().decode(PageAction.self, from: Data(old.utf8)).selected)
 }
