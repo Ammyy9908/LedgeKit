@@ -506,10 +506,13 @@ private final class CheckReport: @unchecked Sendable {
             if page?.screen.content.hasSlider == true { needs("0.22.0", "A slider on a page") }
             if page?.screen.content.hasNativeControls == true || page?.preferredWidth != nil { needs("0.23.0", "Native page controls or preferred width") }
             if page?.screen.content.needsTapeOrTint == true { needs("0.26.0", "A tape, a display or a tinted button") }
+            if page?.screen.content.needsRingLabelOrPanel == true { needs("0.27.0", "A ring, a label or a panel on a page") }
+            if page?.screen.actions.contains(where: { $0.selected || $0.tint != nil }) == true { needs("0.27.0", "A selected or tinted header button") }
         case .activities(let list)?:
             if list.contains(where: { $0.kind != nil || $0.accessibilityValue != nil || $0.importance == .attention }) {
                 needs("0.13.0", "An activity's kind, accessibilityValue or .attention")
             }
+            if list.contains(where: \.leadsHome) { needs("0.27.0", "An activity that leads Home") }
         case .settingsPage(let page)?:
             if page.keywords != nil || page.sections.contains(where: { $0.rows.contains { $0.confirm != nil } }) {
                 needs("0.13.0", "A settings page's keywords or confirmed buttons")

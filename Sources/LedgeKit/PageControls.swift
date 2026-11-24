@@ -67,7 +67,63 @@ public struct PageTape: Codable, Sendable, Equatable {
     }
 }
 
+/// A ring filled part of the way round a picture or symbol, with a title and a caption under it: how much of a plan
+/// is left, a battery, a goal. `value` runs 0 to 1 clockwise from the top. With `value` nil the ring is dotted, for
+/// "nothing known yet", like an account that isn't signed in. With an `id` the ring is a button: pressing it sends
+/// `pressed` with that id, such as to open a screen with the plan's details. Needs 0.27.0.
+public struct PageRing: Codable, Sendable, Equatable {
+    /// Up to 128 characters; nil draws a ring that can't be pressed.
+    public var id: String?
+    public var value: Double?
+    /// A small PNG in the middle, up to ``Surface/maximumPageImageBytes``; it wins over `symbol`.
+    public var image: Data?
+    /// An SF Symbol in the middle when there's no image.
+    public var symbol: String?
+    /// Up to 30 characters, under the ring.
+    public var title: String
+    /// Up to 30 characters under the title, such as "6% left", in `tint`.
+    public var caption: String?
+    /// The ring's and caption's colour; nil is white.
+    public var tint: PageTint?
+    /// What VoiceOver says for the ring, such as "Codex, weekly limit, 6% left". Up to 120 characters.
+    public var accessibilityLabel: String
+
+    public init(id: String? = nil, value: Double?, image: Data? = nil, symbol: String? = nil, title: String,
+                caption: String? = nil, tint: PageTint? = nil, accessibilityLabel: String) {
+        self.id = id; self.value = value; self.image = image; self.symbol = symbol; self.title = title; self.caption = caption
+        self.tint = tint; self.accessibilityLabel = accessibilityLabel
+    }
+}
+
+/// A line of text after a small symbol, both in `tint`, or only the symbol when `tintsText` is false: a status
+/// such as "● Working" in orange, or a step with an orange tick before white text. Up to 200 characters on one
+/// line; Ledge cuts what doesn't fit. Needs 0.27.0.
+public struct PageLabel: Codable, Sendable, Equatable {
+    public var text: String
+    /// An SF Symbol before the text.
+    public var symbol: String?
+    /// The symbol's colour, and the text's when `tintsText` is true; nil is white.
+    public var tint: PageTint?
+    public var tintsText: Bool
+    /// The text's size and weight; nil is body text.
+    public var style: WidgetNode.TextStyle?
+
+    public init(_ text: String, symbol: String? = nil, tint: PageTint? = nil, tintsText: Bool = true,
+                style: WidgetNode.TextStyle? = nil) {
+        self.text = text; self.symbol = symbol; self.tint = tint; self.tintsText = tintsText; self.style = style
+    }
+}
+
 extension PageNode {
+    /// Whether the node uses 0.27.0 controls: a ring, a label or a panel.
+    public var needsRingLabelOrPanel: Bool {
+        switch self {
+        case .ring, .label, .panel: true
+        case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.needsRingLabelOrPanel)
+        default: false
+        }
+    }
+
     /// Whether the node uses 0.26.0 controls: a tape, a display or a tinted button.
     public var needsTapeOrTint: Bool {
         switch self {
@@ -75,6 +131,7 @@ extension PageNode {
         case .control(let button): button.tint != nil
         case .buttonGrid(_, _, let buttons): buttons.contains { $0.tint != nil }
         case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.needsTapeOrTint)
+        case .panel(let child): child.needsTapeOrTint
         default: false
         }
     }
@@ -85,6 +142,7 @@ extension PageNode {
         case .control, .buttonGrid, .readout: true
         case .list(_, let rows): rows.contains { $0.emphasizesSubtitle == true }
         case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.hasNativeControls)
+        case .panel(let child): child.hasNativeControls
         default: false
         }
     }

@@ -353,10 +353,20 @@ public struct LiveActivity: Codable, Sendable, Equatable {
     /// A small PNG (up to 64 KB) that stands for the activity when its text is empty, like an agent's mascot, in place
     /// of the add-on's icon. While the progress is indeterminate Ledge makes it dance. Needs 0.21.0.
     public var image: Data?
+    /// Something the person follows live, like a coding agent at work. While it's up, opening the notch shows the
+    /// add-on's page on Home in place of the widgets, and closed, the activity takes the notch from the song playing,
+    /// which moves beside it. One add-on leads at a time, the one whose activity ranks highest, and the person can turn
+    /// it off in Ledge's settings. Needs the `"notch-page"` surface. Older Ledges ignore it. Needs 0.27.0.
+    public var leadsHome: Bool {
+        get { storedLeadsHome ?? false }
+        set { storedLeadsHome = newValue ? true : nil }
+    }
+    /// Nil for false, so an activity that doesn't lead sends exactly what it did before 0.27.0.
+    private var storedLeadsHome: Bool?
 
     public init(_ id: String, symbol: String, text: String, progress: Progress? = nil,
                 importance: Importance = .normal, lasts: Double? = nil, kind: Kind? = nil, accessibilityValue: String? = nil,
-                image: Data? = nil) {
+                image: Data? = nil, leadsHome: Bool = false) {
         self.id = id
         self.symbol = symbol
         self.text = text
@@ -366,6 +376,12 @@ public struct LiveActivity: Codable, Sendable, Equatable {
         self.kind = kind
         self.accessibilityValue = accessibilityValue
         self.image = image
+        self.leadsHome = leadsHome
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, symbol, text, progress, importance, lasts, kind, accessibilityValue, image
+        case storedLeadsHome = "leadsHome"
     }
 
     /// Kinds of activity Ledge has of its own. While Ledge's own of the same kind is up, the add-on's isn't shown,
@@ -630,12 +646,29 @@ public struct PageAction: Codable, Sendable, Equatable {
     public var label: String
     /// Draws the button in red, for something like Delete.
     public var destructive: Bool
+    /// Draws the button lit, for the one of a pair of views that's showing, such as Sessions beside Usage. Needs 0.27.0.
+    public var selected: Bool {
+        get { storedSelected ?? false }
+        set { storedSelected = newValue ? true : nil }
+    }
+    private var storedSelected: Bool?
+    /// The button's own colour: its symbol always, and its fill while it's `selected`. Nil is white, lit in Ledge's
+    /// accent. Needs 0.27.0.
+    public var tint: PageTint?
 
-    public init(_ id: String, symbol: String, label: String, destructive: Bool = false) {
+    public init(_ id: String, symbol: String, label: String, destructive: Bool = false, selected: Bool = false,
+                tint: PageTint? = nil) {
         self.id = id
         self.symbol = symbol
         self.label = label
         self.destructive = destructive
+        self.storedSelected = selected ? true : nil
+        self.tint = tint
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, symbol, label, destructive, tint
+        case storedSelected = "selected"
     }
 }
 
@@ -679,6 +712,12 @@ public indirect enum PageNode: Codable, Sendable, Equatable {
     /// A large value, such as a timer's "24:59", in 30 point digits that roll as they change, in `tint` (nil is
     /// white). At most 20 characters. Needs 0.26.0.
     case display(String, tint: PageTint?)
+    /// A ring filled part of the way round a picture or symbol; see ``PageRing``. Needs 0.27.0.
+    case ring(PageRing)
+    /// Text after a small tinted symbol; see ``PageLabel``. Needs 0.27.0.
+    case label(PageLabel)
+    /// A rounded, slightly lighter box around its content, such as the command an agent is running. Needs 0.27.0.
+    case panel(PageNode)
 
     public enum Motion: String, Codable, Sendable {
         /// A little side-to-side shake, over and over.
@@ -946,6 +985,23 @@ extension PageScreen {
                 else { throw SurfaceValidationError.invalid("tape \(tape.id)") }
             case let .display(text, _):
                 guard !text.isEmpty, text.count <= 20 else { throw SurfaceValidationError.invalid("display text") }
+            case .ring(let ring):
+                if let id = ring.id {
+                    guard !id.isEmpty, id.count <= 128, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
+                }
+                guard ring.value.map({ (0...1).contains($0) }) ?? true, !ring.title.isEmpty, ring.title.count <= 30,
+                      (ring.caption?.count ?? 0) <= 30, !ring.accessibilityLabel.isEmpty, ring.accessibilityLabel.count <= 120,
+                      (ring.symbol?.count ?? 0) <= 100
+                else { throw SurfaceValidationError.invalid("ring \(ring.title)") }
+                if let image = ring.image {
+                    guard image.count <= Surface.maximumPageImageBytes else { throw SurfaceValidationError.tooLarge("ring image over \(Surface.maximumPageImageBytes) bytes") }
+                    guard image.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) else { throw SurfaceValidationError.invalid("ring image that isn't a PNG") }
+                }
+            case .label(let label):
+                guard !label.text.isEmpty, label.text.count <= 200, (label.symbol?.count ?? 0) <= 100
+                else { throw SurfaceValidationError.invalid("label") }
+            case .panel(let child):
+                try walk(child, depth: depth + 1)
             case let .editor(id, text, placeholder, _):
                 guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 editors += 1

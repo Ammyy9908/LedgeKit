@@ -53,6 +53,30 @@ A tape runs the page's full width.
 accent or selected button and the tape's pointer. Nil keeps Ledge's accent, and older add-ons' buttons decode
 unchanged. All three need `kit.minAPI` 0.26.0; `ledgekit check` says so when a page uses them.
 
+## Activities that lead Home (0.27.0)
+
+`LiveActivity.leadsHome` marks something the person follows live, like a coding agent at work. While it's up,
+opening the notch shows the add-on's page on Home in place of the widgets, and the closed notch shows the activity
+in place of the song playing, which moves beside it. One add-on leads at a time, the one whose activity ranks
+highest, and the person can turn leading off in Ledge's settings. It needs the `"notch-page"` surface and
+`kit.minAPI` 0.27.0, which `ledgekit check` reports. Activities that don't lead encode exactly as before.
+
+## Rings, labels and panels (0.27.0)
+
+`PageNode.ring(PageRing)` draws a ring filled `value` (0 to 1) of the way round a small PNG or SF Symbol, with a
+title and a caption under it in the ring's `PageTint`, such as how much of a plan is left. A nil `value` draws a
+dotted ring, for nothing known yet. Titles and captions are up to 30 characters, and `accessibilityLabel` says it for
+VoiceOver. Give a ring an `id` and it's a button that sends `pressed` with that id, such as to open the plan's
+details. It needs `kit.minAPI` 0.27.0, which `ledgekit check` reports.
+
+`PageNode.label(PageLabel)` is one line of text after a small SF Symbol in a `PageTint`, such as an orange
+"● Working", or with `tintsText: false` an orange tick before white text. `PageNode.panel(node)` draws its content
+in a rounded, slightly lighter box, such as the command an agent is running. Both need 0.27.0.
+
+A header button can be `selected`, which draws it lit: give two of them, such as Sessions and Usage, and light the
+one whose view is showing, so they read as a switch. A header button's `tint` gives it its own colour: its symbol, and
+its fill while selected. Both need 0.27.0.
+
 ## Add the library
 
 During development, place your add-on beside a LedgeKit checkout and declare:

@@ -60,3 +60,51 @@ import Testing
         #expect(throws: (any Error).self) { try PageScreen("main", content: node).validate() }
     }
 }
+
+@Test func ringsRoundTripNeed027AndRejectBadValues() throws {
+    let ring = PageNode.hstack(spacing: 12, children: [
+        .ring(PageRing(value: 0.06, symbol: "sparkle", title: "Codex", caption: "6% left", tint: .red,
+                       accessibilityLabel: "Codex, weekly limit, 6% left")),
+        .ring(PageRing(value: nil, symbol: "person", title: "Cursor", accessibilityLabel: "Cursor, not signed in")),
+    ])
+    try PageScreen("main", content: ring).validate()
+    #expect(try JSONDecoder().decode(PageNode.self, from: JSONEncoder().encode(ring)) == ring)
+    #expect(ring.needsRingLabelOrPanel)
+    #expect(!PageNode.display("1", tint: nil).needsRingLabelOrPanel)
+    for bad in [PageRing(value: 1.5, title: "A", accessibilityLabel: "A"),
+                PageRing(value: 0.5, title: "", accessibilityLabel: "A"),
+                PageRing(value: 0.5, title: "A", accessibilityLabel: ""),
+                PageRing(value: 0.5, image: Data([1, 2, 3]), title: "A", accessibilityLabel: "A")] {
+        #expect(throws: (any Error).self) { try PageScreen("main", content: .ring(bad)).validate() }
+    }
+}
+
+@Test func labelsPanelsAndPressableRingsRoundTripAndValidate() throws {
+    let card = PageNode.vstack(spacing: 6, children: [
+        .label(PageLabel("Working", symbol: "circle.fill", tint: .orange)),
+        .label(PageLabel("Ran swift test", symbol: "checkmark", tint: .orange, tintsText: false)),
+        .panel(.text("swift build", style: nil)),
+        .ring(PageRing(id: "ring-codex", value: 0.05, title: "Codex", accessibilityLabel: "Codex, 5% left")),
+    ])
+    try PageScreen("main", content: card).validate()
+    #expect(try JSONDecoder().decode(PageNode.self, from: JSONEncoder().encode(card)) == card)
+    #expect(PageNode.panel(.spacer).needsRingLabelOrPanel)
+    // A ring from 0.27 without an id still decodes.
+    let old = #"{"value":0.5,"title":"A","accessibilityLabel":"A"}"#
+    #expect(try JSONDecoder().decode(PageRing.self, from: Data(old.utf8)).id == nil)
+    for bad: PageNode in [.label(PageLabel("")), .label(PageLabel(String(repeating: "a", count: 201))),
+                          .panel(.button(id: "", title: "A", symbol: nil)),
+                          .hstack(spacing: nil, children: [.ring(PageRing(id: "x", value: 0, title: "A", accessibilityLabel: "A")),
+                                                           .button(id: "x", title: "B", symbol: nil)])] {
+        #expect(throws: (any Error).self) { try PageScreen("main", content: bad).validate() }
+    }
+}
+
+@Test func aSelectedHeaderButtonRoundTripsAndOldOnesDecode() throws {
+    let action = PageAction("usage", symbol: "gauge", label: "Usage", selected: true)
+    #expect(try JSONDecoder().decode(PageAction.self, from: JSONEncoder().encode(action)).selected)
+    let tinted = PageAction("sessions", symbol: "checklist", label: "Sessions", tint: .orange)
+    #expect(try JSONDecoder().decode(PageAction.self, from: JSONEncoder().encode(tinted)) == tinted)
+    let old = #"{"id":"a","symbol":"gear","label":"A","destructive":false}"#
+    #expect(try !JSONDecoder().decode(PageAction.self, from: Data(old.utf8)).selected)
+}
