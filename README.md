@@ -61,6 +61,13 @@ in place of the song playing, which moves beside it. One add-on leads at a time,
 highest, and the person can turn leading off in Ledge's settings. It needs the `"notch-page"` surface and
 `kit.minAPI` 0.27.0, which `ledgekit check` reports. Activities that don't lead encode exactly as before.
 
+## Rings (0.27.0)
+
+`PageNode.ring(PageRing)` draws a ring filled `value` (0 to 1) of the way round a small PNG or SF Symbol, with a
+title and a caption under it in the ring's `PageTint`, such as how much of a plan is left. A nil `value` draws a
+dotted ring, for nothing known yet. Titles and captions are up to 30 characters, and `accessibilityLabel` says it for
+VoiceOver. It needs `kit.minAPI` 0.27.0, which `ledgekit check` reports.
+
 ## Add the library
 
 During development, place your add-on beside a LedgeKit checkout and declare:

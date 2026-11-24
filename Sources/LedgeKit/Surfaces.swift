@@ -695,6 +695,8 @@ public indirect enum PageNode: Codable, Sendable, Equatable {
     /// A large value, such as a timer's "24:59", in 30 point digits that roll as they change, in `tint` (nil is
     /// white). At most 20 characters. Needs 0.26.0.
     case display(String, tint: PageTint?)
+    /// A ring filled part of the way round a picture or symbol; see ``PageRing``. Needs 0.27.0.
+    case ring(PageRing)
 
     public enum Motion: String, Codable, Sendable {
         /// A little side-to-side shake, over and over.
@@ -962,6 +964,15 @@ extension PageScreen {
                 else { throw SurfaceValidationError.invalid("tape \(tape.id)") }
             case let .display(text, _):
                 guard !text.isEmpty, text.count <= 20 else { throw SurfaceValidationError.invalid("display text") }
+            case .ring(let ring):
+                guard ring.value.map({ (0...1).contains($0) }) ?? true, !ring.title.isEmpty, ring.title.count <= 30,
+                      (ring.caption?.count ?? 0) <= 30, !ring.accessibilityLabel.isEmpty, ring.accessibilityLabel.count <= 120,
+                      (ring.symbol?.count ?? 0) <= 100
+                else { throw SurfaceValidationError.invalid("ring \(ring.title)") }
+                if let image = ring.image {
+                    guard image.count <= Surface.maximumPageImageBytes else { throw SurfaceValidationError.tooLarge("ring image over \(Surface.maximumPageImageBytes) bytes") }
+                    guard image.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) else { throw SurfaceValidationError.invalid("ring image that isn't a PNG") }
+                }
             case let .editor(id, text, placeholder, _):
                 guard !id.isEmpty, ids.insert(id).inserted else { throw SurfaceValidationError.duplicateID(id) }
                 editors += 1

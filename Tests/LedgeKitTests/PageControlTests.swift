@@ -60,3 +60,21 @@ import Testing
         #expect(throws: (any Error).self) { try PageScreen("main", content: node).validate() }
     }
 }
+
+@Test func ringsRoundTripNeed027AndRejectBadValues() throws {
+    let ring = PageNode.hstack(spacing: 12, children: [
+        .ring(PageRing(value: 0.06, symbol: "sparkle", title: "Codex", caption: "6% left", tint: .red,
+                       accessibilityLabel: "Codex, weekly limit, 6% left")),
+        .ring(PageRing(value: nil, symbol: "person", title: "Cursor", accessibilityLabel: "Cursor, not signed in")),
+    ])
+    try PageScreen("main", content: ring).validate()
+    #expect(try JSONDecoder().decode(PageNode.self, from: JSONEncoder().encode(ring)) == ring)
+    #expect(ring.hasRing)
+    #expect(!PageNode.display("1", tint: nil).hasRing)
+    for bad in [PageRing(value: 1.5, title: "A", accessibilityLabel: "A"),
+                PageRing(value: 0.5, title: "", accessibilityLabel: "A"),
+                PageRing(value: 0.5, title: "A", accessibilityLabel: ""),
+                PageRing(value: 0.5, image: Data([1, 2, 3]), title: "A", accessibilityLabel: "A")] {
+        #expect(throws: (any Error).self) { try PageScreen("main", content: .ring(bad)).validate() }
+    }
+}

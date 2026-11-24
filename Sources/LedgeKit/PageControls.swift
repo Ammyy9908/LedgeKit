@@ -67,7 +67,41 @@ public struct PageTape: Codable, Sendable, Equatable {
     }
 }
 
+/// A ring filled part of the way round a picture or symbol, with a title and a caption under it: how much of a plan
+/// is left, a battery, a goal. `value` runs 0 to 1 clockwise from the top. With `value` nil the ring is dotted, for
+/// "nothing known yet", like an account that isn't signed in. Needs 0.27.0.
+public struct PageRing: Codable, Sendable, Equatable {
+    public var value: Double?
+    /// A small PNG in the middle, up to ``Surface/maximumPageImageBytes``; it wins over `symbol`.
+    public var image: Data?
+    /// An SF Symbol in the middle when there's no image.
+    public var symbol: String?
+    /// Up to 30 characters, under the ring.
+    public var title: String
+    /// Up to 30 characters under the title, such as "6% left", in `tint`.
+    public var caption: String?
+    /// The ring's and caption's colour; nil is white.
+    public var tint: PageTint?
+    /// What VoiceOver says for the ring, such as "Codex, weekly limit, 6% left". Up to 120 characters.
+    public var accessibilityLabel: String
+
+    public init(value: Double?, image: Data? = nil, symbol: String? = nil, title: String, caption: String? = nil,
+                tint: PageTint? = nil, accessibilityLabel: String) {
+        self.value = value; self.image = image; self.symbol = symbol; self.title = title; self.caption = caption
+        self.tint = tint; self.accessibilityLabel = accessibilityLabel
+    }
+}
+
 extension PageNode {
+    /// Whether the node uses a 0.27.0 ring.
+    public var hasRing: Bool {
+        switch self {
+        case .ring: true
+        case .vstack(_, let children), .hstack(_, let children): children.contains(where: \.hasRing)
+        default: false
+        }
+    }
+
     /// Whether the node uses 0.26.0 controls: a tape, a display or a tinted button.
     public var needsTapeOrTint: Bool {
         switch self {
