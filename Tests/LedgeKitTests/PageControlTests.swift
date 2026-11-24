@@ -78,3 +78,10 @@ import Testing
         #expect(throws: (any Error).self) { try PageScreen("main", content: .ring(bad)).validate() }
     }
 }
+
+@Test func aSelectedHeaderButtonRoundTripsAndOldOnesDecode() throws {
+    let action = PageAction("usage", symbol: "gauge", label: "Usage", selected: true)
+    #expect(try JSONDecoder().decode(PageAction.self, from: JSONEncoder().encode(action)).selected)
+    let old = #"{"id":"a","symbol":"gear","label":"A","destructive":false}"#
+    #expect(try !JSONDecoder().decode(PageAction.self, from: Data(old.utf8)).selected)
+}

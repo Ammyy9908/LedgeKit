@@ -68,6 +68,9 @@ title and a caption under it in the ring's `PageTint`, such as how much of a pla
 dotted ring, for nothing known yet. Titles and captions are up to 30 characters, and `accessibilityLabel` says it for
 VoiceOver. It needs `kit.minAPI` 0.27.0, which `ledgekit check` reports.
 
+A header button can be `selected`, which draws it lit: give two of them, such as Sessions and Usage, and light the
+one whose view is showing, so they read as a switch. It also needs 0.27.0.
+
 ## Add the library
 
 During development, place your add-on beside a LedgeKit checkout and declare:

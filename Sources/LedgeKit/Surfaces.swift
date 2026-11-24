@@ -646,12 +646,24 @@ public struct PageAction: Codable, Sendable, Equatable {
     public var label: String
     /// Draws the button in red, for something like Delete.
     public var destructive: Bool
+    /// Draws the button lit, for the one of a pair of views that's showing, such as Sessions beside Usage. Needs 0.27.0.
+    public var selected: Bool {
+        get { storedSelected ?? false }
+        set { storedSelected = newValue ? true : nil }
+    }
+    private var storedSelected: Bool?
 
-    public init(_ id: String, symbol: String, label: String, destructive: Bool = false) {
+    public init(_ id: String, symbol: String, label: String, destructive: Bool = false, selected: Bool = false) {
         self.id = id
         self.symbol = symbol
         self.label = label
         self.destructive = destructive
+        self.storedSelected = selected ? true : nil
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, symbol, label, destructive
+        case storedSelected = "selected"
     }
 }
 

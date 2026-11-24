@@ -507,6 +507,7 @@ private final class CheckReport: @unchecked Sendable {
             if page?.screen.content.hasNativeControls == true || page?.preferredWidth != nil { needs("0.23.0", "Native page controls or preferred width") }
             if page?.screen.content.needsTapeOrTint == true { needs("0.26.0", "A tape, a display or a tinted button") }
             if page?.screen.content.hasRing == true { needs("0.27.0", "A ring on a page") }
+            if page?.screen.actions.contains(where: \.selected) == true { needs("0.27.0", "A selected header button") }
         case .activities(let list)?:
             if list.contains(where: { $0.kind != nil || $0.accessibilityValue != nil || $0.importance == .attention }) {
                 needs("0.13.0", "An activity's kind, accessibilityValue or .attention")
